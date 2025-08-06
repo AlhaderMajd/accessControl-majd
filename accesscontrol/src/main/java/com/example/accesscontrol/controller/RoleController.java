@@ -2,6 +2,7 @@ package com.example.accesscontrol.controller;
 
 import com.example.accesscontrol.dto.CreateRoleRequest;
 import com.example.accesscontrol.dto.CreateRoleResponse;
+import com.example.accesscontrol.dto.GetRolesResponse;
 import com.example.accesscontrol.service.RoleService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -21,5 +22,14 @@ public class RoleController {
     public ResponseEntity<CreateRoleResponse> createRoles(@RequestBody List<CreateRoleRequest> requestList) {
         CreateRoleResponse response = roleService.createRoles(requestList);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @GetMapping
+    public GetRolesResponse getRoles(
+            @RequestParam(defaultValue = "") String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        return roleService.getRoles(search, page, size);
     }
 }

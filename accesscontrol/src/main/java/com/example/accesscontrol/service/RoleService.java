@@ -2,12 +2,17 @@ package com.example.accesscontrol.service;
 
 import com.example.accesscontrol.dto.CreateRoleRequest;
 import com.example.accesscontrol.dto.CreateRoleResponse;
+import com.example.accesscontrol.dto.GetRolesResponse;
+import com.example.accesscontrol.dto.RoleResponse;
 import com.example.accesscontrol.entity.Role;
 import com.example.accesscontrol.entity.RolePermission;
 import com.example.accesscontrol.exception.DuplicateResourceException;
 import com.example.accesscontrol.exception.ResourceNotFoundException;
 import com.example.accesscontrol.repository.RoleRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
@@ -85,6 +90,30 @@ public class RoleService {
         return CreateRoleResponse.builder()
                 .message("Roles created successfully")
                 .created(names)
+                .build();
+    }
+
+    public GetRolesResponse getRoles(String search, int page, int size) {
+        if (page < 0 || size <= 0) {
+            throw new IllegalArgumentException("Invalid pagination or search parameters");
+        }
+
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Role> rolePage = roleRepository.findByNameContainingIgnoreCase(search, pageable);
+
+        List<RoleResponse> roles = rolePage.getContent().stream()
+                .map(role -> {
+                    RoleResponse dto = new RoleResponse();
+                    dto.setId(role.getId());
+                    dto.setName(role.getName());
+                    return dto;
+                })
+                .toList();
+
+        return GetRolesResponse.builder()
+                .roles(roles)
+                .page(page)
+                .total(rolePage.getTotalElements())
                 .build();
     }
 
