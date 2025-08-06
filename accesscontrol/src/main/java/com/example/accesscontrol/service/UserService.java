@@ -25,7 +25,7 @@ public class UserService {
     private final RoleService roleService;
     private final UserGroupService userGroupService;
     private final GroupService groupService;
-    
+
     @PersistenceContext
     private EntityManager em;
 
