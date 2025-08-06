@@ -56,7 +56,6 @@ public class AuthService {
             throw new EmailAlreadyUsedException("Email already in use");
         }
 
-        // 1. Create and save user
         User newUser = new User();
         newUser.setEmail(request.getEmail());
         newUser.setPassword(passwordEncoder.encode(request.getPassword()));
@@ -64,10 +63,8 @@ public class AuthService {
 
         User savedUser = userService.save(newUser);
 
-        // 2. Assign MEMBER role using userRoleService
         Role savedRole = userRoleService.assignRoleToUser(savedUser.getId(), "MEMBER");
 
-        // 3. Generate JWT token
         String token = jwtTokenProvider.generateToken(savedUser.getEmail());
 
         return AuthResponse.builder()
