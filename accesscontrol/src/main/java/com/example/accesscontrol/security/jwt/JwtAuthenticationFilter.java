@@ -31,7 +31,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             }
         } catch (Exception ex) {
-            logger.error("Failed to set user authentication from JWT", ex);
+            logger.warn("Invalid JWT: " + ex.getMessage());
         }
 
         filterChain.doFilter(request, response);

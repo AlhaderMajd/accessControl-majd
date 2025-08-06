@@ -1,6 +1,7 @@
 package com.example.accesscontrol.controller;
 
 import com.example.accesscontrol.dto.*;
+import com.example.accesscontrol.exception.EmailAlreadyUsedException;
 import com.example.accesscontrol.exception.InvalidCredentialsException;
 import com.example.accesscontrol.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -62,6 +63,22 @@ public class UserController {
         }
 
     }
+
+    @PutMapping("/email")
+    public ResponseEntity<Map<String, String>> changeEmail(@RequestBody UpdateEmailRequest request) {
+        try {
+            userService.changeEmail(request);
+            return ResponseEntity.ok(Map.of("message", "Email updated successfully"));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (EmailAlreadyUsedException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            e.printStackTrace(); // optional: helpful during dev
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("message", "Failed to update email"));
+        }
+    }
+
 
 
 }

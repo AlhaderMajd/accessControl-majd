@@ -3,10 +3,7 @@ package com.example.accesscontrol.service;
 import com.example.accesscontrol.dto.*;
 import com.example.accesscontrol.entity.Role;
 import com.example.accesscontrol.entity.User;
-import com.example.accesscontrol.exception.DuplicateEmailException;
-import com.example.accesscontrol.exception.InvalidCredentialsException;
-import com.example.accesscontrol.exception.ResourceNotFoundException;
-import com.example.accesscontrol.exception.UserNotFoundException;
+import com.example.accesscontrol.exception.*;
 import com.example.accesscontrol.repository.UserRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -129,6 +126,29 @@ public class UserService {
         }
 
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+    }
+
+    public void changeEmail(UpdateEmailRequest request) {
+        String newEmail = request.getNewEmail();
+
+        if (!isValidEmail(newEmail)) {
+            throw new IllegalArgumentException("Invalid email format");
+        }
+
+        if (emailExists(newEmail)) {
+            throw new EmailAlreadyUsedException("Email already taken");
+        }
+
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        if (!(principal instanceof User)) {
+            throw new RuntimeException("Unexpected principal type");
+        }
+
+        User user = (User) principal;
+        user.setEmail(newEmail);
+
         userRepository.save(user);
     }
 
