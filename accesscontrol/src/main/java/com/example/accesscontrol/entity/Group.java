@@ -1,17 +1,16 @@
 package com.example.accesscontrol.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "groups")
-@Getter
-@Setter
+@Table(name = "`groups`")
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class Group {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

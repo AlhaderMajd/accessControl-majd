@@ -1,15 +1,13 @@
 package com.example.accesscontrol.config;
 
-import com.example.accesscontrol.entity.Role;
-import com.example.accesscontrol.entity.User;
-import com.example.accesscontrol.entity.UserRole;
-import com.example.accesscontrol.repository.RoleRepository;
-import com.example.accesscontrol.repository.UserRepository;
-import com.example.accesscontrol.repository.UserRoleRepository;
+import com.example.accesscontrol.entity.*;
+import com.example.accesscontrol.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;
+
+import java.util.List;
 
 @Configuration
 @RequiredArgsConstructor
@@ -62,11 +60,10 @@ public class DataInitializer implements CommandLineRunner {
             user = userRepository.save(user);
 
             // Assign roles
-            userRoleRepository.save(new UserRole(admin.getId(), adminRole.getId()));   // ADMIN
-            userRoleRepository.save(new UserRole(adminAndMember.getId(), adminRole.getId()));   // ADMIN
-            userRoleRepository.save(new UserRole(adminAndMember.getId(), memberRole.getId()));  // MEMBER
-            userRoleRepository.save(new UserRole(user.getId(), memberRole.getId()));   // MEMBER
-
+            userRoleRepository.save(new UserRole(admin.getId(), adminRole.getId()));
+            userRoleRepository.save(new UserRole(adminAndMember.getId(), adminRole.getId()));
+            userRoleRepository.save(new UserRole(adminAndMember.getId(), memberRole.getId()));
+            userRoleRepository.save(new UserRole(user.getId(), memberRole.getId()));
 
             System.out.println("✅ Inserted test users and roles:");
             System.out.println("   admin@example.com [ADMIN]");

@@ -1,10 +1,14 @@
 package com.example.accesscontrol.service;
 
+import com.example.accesscontrol.dto.AssignUsersToGroupsRequest;
+import com.example.accesscontrol.dto.AssignUsersToGroupsResponse;
 import com.example.accesscontrol.entity.Group;
 import com.example.accesscontrol.exception.ResourceNotFoundException;
 import com.example.accesscontrol.repository.GroupRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 import java.util.Optional;
 
 @Service

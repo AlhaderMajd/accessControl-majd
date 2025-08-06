@@ -4,6 +4,7 @@ import com.example.accesscontrol.dto.*;
 import com.example.accesscontrol.exception.EmailAlreadyUsedException;
 import com.example.accesscontrol.exception.InvalidCredentialsException;
 import com.example.accesscontrol.exception.ResourceNotFoundException;
+import com.example.accesscontrol.service.UserGroupService;
 import com.example.accesscontrol.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -18,6 +19,7 @@ import java.util.Map;
 public class UserController {
 
     private final UserService userService;
+    private final UserGroupService userGroupService;
 
     @PostMapping
     public ResponseEntity<BulkCreateUsersResponse> createUsers(@RequestBody BulkCreateUsersRequest request) {
@@ -128,6 +130,19 @@ public class UserController {
         }
     }
 
-
-
+    @PostMapping("/groups/assign")
+    public ResponseEntity<?> assignUsersToGroups(@RequestBody AssignUsersToGroupsRequest request) {
+        try {
+            AssignUsersToGroupsResponse response = userGroupService.assignUsersToGroups(request);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Failed to assign users to groups"));
+        }
+    }
 }

@@ -5,8 +5,7 @@ import lombok.*;
 
 @Entity
 @Table(name = "role_permissions")
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @IdClass(RolePermissionId.class)

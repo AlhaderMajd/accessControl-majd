@@ -214,6 +214,10 @@ public class UserService {
         return users;
     }
 
+    public AssignUsersToGroupsResponse assignUsersToGroups(AssignUsersToGroupsRequest request) {
+        return userGroupService.assignUsersToGroups(request);
+    }
+
     public User getByEmailOrThrow(String email) {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new UserNotFoundException(email));

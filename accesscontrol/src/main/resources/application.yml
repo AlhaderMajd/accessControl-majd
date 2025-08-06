@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/accesscontrol
+    url: jdbc:mysql://localhost:3306/accesscontrol?createDatabaseIfNotExist=true
     username: springstudent
     password: springstudent
   jpa:
@@ -13,4 +13,3 @@ spring:
 
 jwt:
   secret: mySuperSecureSecretKey1234567890!
-

@@ -5,8 +5,7 @@ import lombok.*;
 
 @Entity
 @Table(name = "group_roles")
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @IdClass(GroupRoleId.class)

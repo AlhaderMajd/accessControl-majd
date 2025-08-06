@@ -5,8 +5,7 @@ import lombok.*;
 
 @Entity
 @Table(name = "permissions")
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
