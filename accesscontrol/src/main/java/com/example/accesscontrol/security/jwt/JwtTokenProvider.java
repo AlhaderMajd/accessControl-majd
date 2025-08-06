@@ -46,11 +46,9 @@ public class JwtTokenProvider {
     public Authentication getAuthentication(String token) {
         String email = getEmailFromToken(token);
 
-        // Get user
         var user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // Get roles
         List<UserRole> userRoles = userRoleRepository.findByUserId(user.getId());
         List<String> roleNames = userRoles.stream()
                 .map(userRole -> roleRepository.findById(userRole.getRoleId())

@@ -18,7 +18,6 @@ public class UserRoleService {
     private final UserRoleRepository userRoleRepository;
     private final RoleService roleService;
 
-    // ✅ Used in UserService → getUserDetails
     public List<String> getRoleNamesByUserId(Long userId) {
         List<UserRole> userRoles = userRoleRepository.findByUserId(userId);
 
@@ -28,7 +27,6 @@ public class UserRoleService {
                 .collect(Collectors.toList());
     }
 
-    // ✅ Used in UserService → createUsers (assign MEMBER role)
     public Role assignRoleToUser(Long userId, String roleName) {
         Role role = roleService.getOrCreateRole(roleName);
 
