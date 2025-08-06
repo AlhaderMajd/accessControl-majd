@@ -1,17 +1,12 @@
 package com.example.accesscontrol.service;
 
-import com.example.accesscontrol.dto.AssignRolesRequest;
-import com.example.accesscontrol.dto.AssignRolesResponse;
-import com.example.accesscontrol.dto.DeassignRolesRequest;
 import com.example.accesscontrol.dto.DeassignRolesResponse;
 import com.example.accesscontrol.entity.Role;
 import com.example.accesscontrol.entity.User;
 import com.example.accesscontrol.entity.UserRole;
-import com.example.accesscontrol.exception.ResourceNotFoundException;
 import com.example.accesscontrol.repository.UserRoleRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -65,4 +60,9 @@ public class UserRoleService {
                 .removedCount(removed)
                 .build();
     }
+
+    public void deleteByUserIds(List<Long> userIds) {
+        userRoleRepository.deleteByUserIdIn(userIds);
+    }
+
 }

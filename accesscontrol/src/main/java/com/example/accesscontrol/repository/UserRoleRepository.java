@@ -11,5 +11,6 @@ public interface UserRoleRepository extends JpaRepository<UserRole, UserRoleId> 
     List<UserRole> findByUserIdInAndRoleIdIn(List<Long> userIds, List<Long> roleIds);
     @Transactional
     int deleteByUserIdInAndRoleIdIn(List<Long> userIds, List<Long> roleIds);
+    void deleteByUserIdIn(List<Long> userIds);
 
 }

@@ -161,4 +161,10 @@ public class UserController {
         }
     }
 
+    @DeleteMapping
+    public ResponseEntity<DeleteUsersResponse> deleteUsers(@RequestBody DeleteUsersRequest request) {
+        DeleteUsersResponse response = userService.deleteUsers(request);
+        return ResponseEntity.ok(response);
+    }
+
 }

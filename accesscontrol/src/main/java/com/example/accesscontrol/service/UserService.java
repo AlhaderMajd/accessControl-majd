@@ -8,12 +8,11 @@ import com.example.accesscontrol.repository.UserRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.TypedQuery;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -26,6 +25,7 @@ public class UserService {
     private final RoleService roleService;
     private final UserGroupService userGroupService;
     private final GroupService groupService;
+    
     @PersistenceContext
     private EntityManager em;
 
@@ -223,6 +223,37 @@ public class UserService {
 
         // Delegate deletion
         return userGroupService.deassignUsersFromGroups(request);
+    }
+
+    @Transactional
+    public DeleteUsersResponse deleteUsers(DeleteUsersRequest request) {
+        List<Long> userIds = request.getUserIds();
+
+        if (userIds == null || userIds.isEmpty()) {
+            throw new IllegalArgumentException("User ID list is invalid");
+        }
+
+        // Check existence
+        List<User> users = userRepository.findAllById(userIds);
+        if (users.size() != userIds.size()) {
+            throw new ResourceNotFoundException("Some users not found");
+        }
+
+        try {
+            // Delete relations
+            userRoleService.deleteByUserIds(userIds);
+            userGroupService.deleteByUserIds(userIds);
+
+            // Delete users
+            userRepository.deleteAllById(userIds);
+
+            return DeleteUsersResponse.builder()
+                    .message("Users deleted successfully")
+                    .deletedCount(userIds.size())
+                    .build();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to delete users");
+        }
     }
 
 

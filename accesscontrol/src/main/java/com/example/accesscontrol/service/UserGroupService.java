@@ -6,12 +6,10 @@ import com.example.accesscontrol.dto.DeassignUsersFromGroupsRequest;
 import com.example.accesscontrol.dto.DeassignUsersFromGroupsResponse;
 import com.example.accesscontrol.entity.Group;
 import com.example.accesscontrol.entity.UserGroup;
-import com.example.accesscontrol.exception.ResourceNotFoundException;
 import com.example.accesscontrol.repository.UserGroupRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -63,4 +61,10 @@ public class UserGroupService {
                 .map(Group::getName)
                 .collect(Collectors.toList());
     }
+
+    @Transactional
+    public void deleteByUserIds(List<Long> userIds) {
+        userGroupRepository.deleteByUserIdIn(userIds);
+    }
+
 }
