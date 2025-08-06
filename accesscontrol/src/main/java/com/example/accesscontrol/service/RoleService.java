@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -154,6 +155,43 @@ public class RoleService {
 
         return UpdateRoleResponse.builder()
                 .message("Role name updated successfully")
+                .build();
+    }
+
+    public AssignPermissionsToRolesResponse assignPermissionsToRoles(List<AssignPermissionsToRolesItem> request) {
+        if (request == null || request.isEmpty()) {
+            throw new IllegalArgumentException("Invalid or empty input");
+        }
+
+        Set<Long> roleIds = request.stream()
+                .map(AssignPermissionsToRolesItem::getRoleId)
+                .collect(Collectors.toSet());
+
+        Set<Long> permissionIds = request.stream()
+                .flatMap(r -> r.getPermissionIds().stream())
+                .collect(Collectors.toSet());
+
+        // Validate roles and permissions
+        List<Role> roles = getByIdsOrThrow(new ArrayList<>(roleIds));
+        List<Permission> permissions = permissionService.getByIdsOrThrow(new ArrayList<>(permissionIds));
+
+        List<RolePermission> toInsert = new ArrayList<>();
+        for (AssignPermissionsToRolesItem item : request) {
+            for (Long permId : item.getPermissionIds()) {
+                toInsert.add(new RolePermission(item.getRoleId(), permId));
+            }
+        }
+
+        try {
+            rolePermissionService.saveAll(toInsert);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to assign permissions");
+        }
+
+        return AssignPermissionsToRolesResponse.builder()
+                .message("Permissions assigned successfully")
+                .assignedCount(toInsert.size())
+                .rolesUpdated(roleIds.size())
                 .build();
     }
 }
