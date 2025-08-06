@@ -137,4 +137,23 @@ public class RoleService {
                 .build();
     }
 
+    public UpdateRoleResponse updateRoleName(Long roleId, UpdateRoleRequest request) {
+        if (request.getName() == null || request.getName().isBlank()) {
+            throw new IllegalArgumentException("Invalid role name");
+        }
+
+        Role role = roleRepository.findById(roleId)
+                .orElseThrow(() -> new ResourceNotFoundException("Role not found"));
+
+        role.setName(request.getName());
+        try {
+            roleRepository.save(role);
+        } catch (Exception e) {
+            throw new RuntimeException("Could not update role name");
+        }
+
+        return UpdateRoleResponse.builder()
+                .message("Role name updated successfully")
+                .build();
+    }
 }

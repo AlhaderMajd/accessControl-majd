@@ -1,10 +1,8 @@
 package com.example.accesscontrol.controller;
 
-import com.example.accesscontrol.dto.CreateRoleRequest;
-import com.example.accesscontrol.dto.CreateRoleResponse;
-import com.example.accesscontrol.dto.GetRolesResponse;
-import com.example.accesscontrol.dto.RoleWithPermissionsResponse;
+import com.example.accesscontrol.dto.*;
 import com.example.accesscontrol.service.RoleService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -39,4 +37,11 @@ public class RoleController {
         return roleService.getRoleWithPermissions(roleId);
     }
 
+    @PutMapping("/{roleId}")
+    public ResponseEntity<UpdateRoleResponse> updateRoleName(
+            @PathVariable Long roleId,
+            @Valid @RequestBody UpdateRoleRequest request) {
+        UpdateRoleResponse response = roleService.updateRoleName(roleId, request);
+        return ResponseEntity.ok(response);
+    }
 }
