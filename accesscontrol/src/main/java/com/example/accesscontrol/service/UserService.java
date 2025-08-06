@@ -199,6 +199,13 @@ public class UserService {
                 .assignedCount(assignedCount)
                 .build();
     }
+    public DeassignRolesResponse deassignRolesFromUsers(DeassignRolesRequest request) {
+        List<User> users = getByIdsOrThrow(request.getUserIds());
+        List<Role> roles = roleService.getByIdsOrThrow(request.getRoleIds());
+        return userRoleService.deassignRoles(users, roles);
+    }
+
+
     public List<User> getByIdsOrThrow(List<Long> userIds) {
         List<User> users = userRepository.findAllById(userIds);
         if (users.size() != userIds.size()) {

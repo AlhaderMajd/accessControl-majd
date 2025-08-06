@@ -2,6 +2,8 @@ package com.example.accesscontrol.service;
 
 import com.example.accesscontrol.dto.AssignRolesRequest;
 import com.example.accesscontrol.dto.AssignRolesResponse;
+import com.example.accesscontrol.dto.DeassignRolesRequest;
+import com.example.accesscontrol.dto.DeassignRolesResponse;
 import com.example.accesscontrol.entity.Role;
 import com.example.accesscontrol.entity.User;
 import com.example.accesscontrol.entity.UserRole;
@@ -51,4 +53,18 @@ public class UserRoleService {
         userRoleRepository.saveAll(newAssignments);
         return newAssignments.size();
     }
+
+    public DeassignRolesResponse deassignRoles(List<User> users, List<Role> roles) {
+        List<Long> userIds = users.stream().map(User::getId).toList();
+        List<Long> roleIds = roles.stream().map(Role::getId).toList();
+
+        int removed = userRoleRepository.deleteByUserIdInAndRoleIdIn(userIds, roleIds);
+
+        return DeassignRolesResponse.builder()
+                .message("Roles deassigned successfully")
+                .removedCount(removed)
+                .build();
+    }
+
+
 }

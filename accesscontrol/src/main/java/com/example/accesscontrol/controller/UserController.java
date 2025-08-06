@@ -112,4 +112,22 @@ public class UserController {
         }
     }
 
+    @DeleteMapping("/roles/deassign")
+    public ResponseEntity<?> deassignRoles(@RequestBody DeassignRolesRequest request) {
+        try {
+            DeassignRolesResponse response = userService.deassignRolesFromUsers(request);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Failed to deassign roles"));
+        }
+    }
+
+
+
 }
