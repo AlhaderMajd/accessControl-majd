@@ -205,6 +205,11 @@ public class UserService {
         return userRoleService.deassignRoles(users, roles);
     }
 
+    public AssignUsersToGroupsResponse assignUsersToGroups(AssignUsersToGroupsRequest request) {
+        return userGroupService.assignUsersToGroups(request);
+    }
+
+
 
     public List<User> getByIdsOrThrow(List<Long> userIds) {
         List<User> users = userRepository.findAllById(userIds);
@@ -212,10 +217,6 @@ public class UserService {
             throw new ResourceNotFoundException("Some users not found");
         }
         return users;
-    }
-
-    public AssignUsersToGroupsResponse assignUsersToGroups(AssignUsersToGroupsRequest request) {
-        return userGroupService.assignUsersToGroups(request);
     }
 
     public User getByEmailOrThrow(String email) {
@@ -238,6 +239,4 @@ public class UserService {
     private boolean isValidPassword(String password) {
         return password != null && password.length() >= 6;
     }
-
-
 }

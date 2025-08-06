@@ -36,6 +36,4 @@ public class RoleService {
         }
         return roles;
     }
-
-
 }

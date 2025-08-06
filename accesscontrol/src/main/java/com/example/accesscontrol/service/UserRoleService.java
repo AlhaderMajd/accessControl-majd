@@ -65,6 +65,4 @@ public class UserRoleService {
                 .removedCount(removed)
                 .build();
     }
-
-
 }

@@ -48,5 +48,4 @@ public class UserGroupService {
                 .map(Group::getName)
                 .collect(Collectors.toList());
     }
-
 }

@@ -19,7 +19,6 @@ import java.util.Map;
 public class UserController {
 
     private final UserService userService;
-    private final UserGroupService userGroupService;
 
     @PostMapping
     public ResponseEntity<BulkCreateUsersResponse> createUsers(@RequestBody BulkCreateUsersRequest request) {
@@ -60,7 +59,7 @@ public class UserController {
         } catch (InvalidCredentialsException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", e.getMessage()));
         } catch (Exception e) {
-            e.printStackTrace(); // 🔍 log the exact error in console
+            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("message", "Failed to update password"));
         }
@@ -77,7 +76,7 @@ public class UserController {
         } catch (EmailAlreadyUsedException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", e.getMessage()));
         } catch (Exception e) {
-            e.printStackTrace(); // optional: helpful during dev
+            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("message", "Failed to update email"));
         }
     }
@@ -133,7 +132,7 @@ public class UserController {
     @PostMapping("/groups/assign")
     public ResponseEntity<?> assignUsersToGroups(@RequestBody AssignUsersToGroupsRequest request) {
         try {
-            AssignUsersToGroupsResponse response = userGroupService.assignUsersToGroups(request);
+            AssignUsersToGroupsResponse response = userService.assignUsersToGroups(request);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
@@ -145,4 +144,5 @@ public class UserController {
                     .body(Map.of("message", "Failed to assign users to groups"));
         }
     }
+
 }
