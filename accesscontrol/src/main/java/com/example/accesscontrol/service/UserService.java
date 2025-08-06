@@ -152,6 +152,32 @@ public class UserService {
         userRepository.save(user);
     }
 
+    public UpdateUserStatusResponse updateUserStatus(UpdateUserStatusRequest request) {
+        List<Long> userIds = request.getUserIds();
+        Boolean enabled = request.getEnabled();
+
+        if (userIds == null || userIds.isEmpty() || enabled == null) {
+            throw new IllegalArgumentException("User list or status flag is missing/invalid");
+        }
+
+        List<User> users = userRepository.findAllById(userIds);
+
+        if (users.isEmpty()) {
+            throw new ResourceNotFoundException("No users found to update");
+        }
+
+        for (User user : users) {
+            user.setEnabled(enabled);
+        }
+
+        List<User> updatedUsers = userRepository.saveAll(users);
+
+        return UpdateUserStatusResponse.builder()
+                .message("User status updated successfully")
+                .updatedCount(updatedUsers.size())
+                .build();
+    }
+
 
     public User getByEmailOrThrow(String email) {
         return userRepository.findByEmail(email)
