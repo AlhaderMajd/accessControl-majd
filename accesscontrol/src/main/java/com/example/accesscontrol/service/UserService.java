@@ -4,6 +4,8 @@ import com.example.accesscontrol.dto.*;
 import com.example.accesscontrol.entity.Role;
 import com.example.accesscontrol.entity.User;
 import com.example.accesscontrol.exception.DuplicateEmailException;
+import com.example.accesscontrol.exception.ResourceNotFoundException;
+import com.example.accesscontrol.exception.UserNotFoundException;
 import com.example.accesscontrol.repository.UserRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -22,6 +24,7 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final UserRoleService userRoleService;
     private final RoleService roleService;
+    private final UserGroupService userGroupService;
 
     @PersistenceContext
     private EntityManager em;
@@ -85,6 +88,39 @@ public class UserService {
         return new GetUsersResponse(users, page, total);
     }
 
+    public UserDetailsResponse getUserDetails(Long id) {
+        if (id == null || id <= 0) {
+            throw new IllegalArgumentException("Invalid user ID");
+        }
+
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        List<String> roles = userRoleService.getRoleNamesByUserId(user.getId());
+        List<String> groups = userGroupService.getGroupNamesByUserId(user.getId());
+
+        return UserDetailsResponse.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .enabled(user.isEnabled())
+                .roles(roles)
+                .groups(groups)
+                .build();
+    }
+
+    public User getByEmailOrThrow(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new UserNotFoundException(email));
+    }
+
+    public boolean emailExists(String email) {
+        return userRepository.findByEmail(email).isPresent();
+    }
+
+    public User save(User user) {
+        return userRepository.save(user);
+    }
+
     private boolean isValidEmail(String email) {
         return email != null && email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$");
     }
@@ -92,4 +128,6 @@ public class UserService {
     private boolean isValidPassword(String password) {
         return password != null && password.length() >= 6;
     }
+
+
 }

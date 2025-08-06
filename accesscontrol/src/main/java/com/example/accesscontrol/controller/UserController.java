@@ -32,4 +32,15 @@ public class UserController {
 
         return ResponseEntity.ok(userService.getUsers(search, page, size));
     }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<UserDetailsResponse> getUserDetails(@PathVariable Long id) {
+        try {
+            UserDetailsResponse response = userService.getUserDetails(id);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(null);
+        }
+    }
+
 }

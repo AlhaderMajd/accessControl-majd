@@ -4,31 +4,25 @@ import com.example.accesscontrol.dto.AuthRequest;
 import com.example.accesscontrol.dto.AuthResponse;
 import com.example.accesscontrol.entity.Role;
 import com.example.accesscontrol.entity.User;
-import com.example.accesscontrol.entity.UserRole;
 import com.example.accesscontrol.exception.*;
-import com.example.accesscontrol.repository.RoleRepository;
-import com.example.accesscontrol.repository.UserRepository;
-import com.example.accesscontrol.repository.UserRoleRepository;
 import com.example.accesscontrol.security.jwt.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class AuthService {
 
-    private final UserRepository userRepository;
+    private final UserService userService;
     private final UserRoleService userRoleService;
     private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
-    private final UserRoleRepository userRoleRepository;
-    private final RoleRepository roleRepository;
 
     public AuthResponse login(AuthRequest request) {
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new UserNotFoundException(request.getEmail()));
+        User user = userService.getByEmailOrThrow(request.getEmail());
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new InvalidCredentialsException();
@@ -38,20 +32,13 @@ public class AuthService {
             throw new UserDisabledException();
         }
 
-        String token = jwtTokenProvider.generateToken(user.getEmail());
+        List<String> roles = userRoleService.getRoleNamesByUserId(user.getId());
 
-        List<UserRole> userRoles = userRoleRepository.findByUserId(user.getId());
-
-        if (userRoles.isEmpty()) {
+        if (roles.isEmpty()) {
             throw new RuntimeException("User has no assigned roles");
         }
 
-        List<String> roles = userRoles.stream()
-                .map(userRole -> roleRepository.findById(userRole.getRoleId())
-                        .orElseThrow(() -> new RuntimeException("Role not found")))
-                .map(Role::getName)
-                .toList();
-
+        String token = jwtTokenProvider.generateToken(user.getEmail());
 
         return AuthResponse.builder()
                 .token(token)
@@ -65,7 +52,7 @@ public class AuthService {
             throw new IllegalArgumentException("Invalid email or password format");
         }
 
-        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+        if (userService.emailExists(request.getEmail())) {
             throw new EmailAlreadyUsedException("Email already in use");
         }
 
@@ -75,7 +62,7 @@ public class AuthService {
         newUser.setPassword(passwordEncoder.encode(request.getPassword()));
         newUser.setEnabled(true);
 
-        User savedUser = userRepository.save(newUser);
+        User savedUser = userService.save(newUser);
 
         // 2. Assign MEMBER role using userRoleService
         Role savedRole = userRoleService.assignRoleToUser(savedUser.getId(), "MEMBER");
@@ -89,7 +76,6 @@ public class AuthService {
                 .roles(List.of(savedRole.getName()))
                 .build();
     }
-
 
     private boolean isValidEmail(String email) {
         return email != null && email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$");

@@ -4,18 +4,18 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "user_roles")
+@Table(name = "role_permissions")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@IdClass(UserRoleId.class)
-public class UserRole {
-    @Id
-    @Column(name = "user_id")
-    private Long userId;
-
+@IdClass(RolePermissionId.class)
+public class RolePermission {
     @Id
     @Column(name = "role_id")
     private Long roleId;
+
+    @Id
+    @Column(name = "permission_id")
+    private Long permissionId;
 }

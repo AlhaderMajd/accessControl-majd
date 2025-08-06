@@ -4,18 +4,18 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "user_roles")
+@Table(name = "user_groups")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@IdClass(UserRoleId.class)
-public class UserRole {
+@IdClass(UserGroupId.class)
+public class UserGroup {
     @Id
     @Column(name = "user_id")
     private Long userId;
 
     @Id
-    @Column(name = "role_id")
-    private Long roleId;
+    @Column(name = "group_id")
+    private Long groupId;
 }

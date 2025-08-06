@@ -8,7 +8,7 @@ import java.io.Serializable;
 @NoArgsConstructor
 @AllArgsConstructor
 @EqualsAndHashCode
-public class UserRoleId implements Serializable {
+public class UserGroupId implements Serializable {
     private Long userId;
-    private Long roleId;
+    private Long groupId;
 }
