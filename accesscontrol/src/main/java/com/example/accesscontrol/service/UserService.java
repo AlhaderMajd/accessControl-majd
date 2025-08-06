@@ -178,6 +178,34 @@ public class UserService {
                 .build();
     }
 
+    public AssignRolesResponse assignRolesToUsers(AssignRolesRequest request) {
+        List<Long> userIds = request.getUserIds();
+        List<Long> roleIds = request.getRoleIds();
+
+        if (userIds == null || userIds.isEmpty() || roleIds == null || roleIds.isEmpty()) {
+            throw new IllegalArgumentException("User or role list is invalid or empty");
+        }
+
+        List<User> users = getByIdsOrThrow(userIds);
+        List<Role> roles = roleService.getByIdsOrThrow(roleIds);
+
+        int assignedCount = userRoleService.assignRolesToUsers(
+                users.stream().map(User::getId).toList(),
+                roles.stream().map(Role::getId).toList()
+        );
+
+        return AssignRolesResponse.builder()
+                .message("Roles assigned successfully")
+                .assignedCount(assignedCount)
+                .build();
+    }
+    public List<User> getByIdsOrThrow(List<Long> userIds) {
+        List<User> users = userRepository.findAllById(userIds);
+        if (users.size() != userIds.size()) {
+            throw new ResourceNotFoundException("Some users not found");
+        }
+        return users;
+    }
 
     public User getByEmailOrThrow(String email) {
         return userRepository.findByEmail(email)

@@ -96,5 +96,20 @@ public class UserController {
         }
     }
 
+    @PostMapping("/roles/assign")
+    public ResponseEntity<?> assignRoles(@RequestBody AssignRolesRequest request) {
+        try {
+            AssignRolesResponse response = userService.assignRolesToUsers(request);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Failed to assign roles"));
+        }
+    }
 
 }

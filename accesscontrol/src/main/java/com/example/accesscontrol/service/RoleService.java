@@ -1,10 +1,13 @@
 package com.example.accesscontrol.service;
 
 import com.example.accesscontrol.entity.Role;
+import com.example.accesscontrol.entity.User;
 import com.example.accesscontrol.exception.ResourceNotFoundException;
 import com.example.accesscontrol.repository.RoleRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -25,4 +28,14 @@ public class RoleService {
         return roleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Role not found"));
     }
+
+    public List<Role> getByIdsOrThrow(List<Long> ids) {
+        List<Role> roles = roleRepository.findAllById(ids);
+        if (roles.size() != ids.size()) {
+            throw new ResourceNotFoundException("Some roles not found");
+        }
+        return roles;
+    }
+
+
 }
