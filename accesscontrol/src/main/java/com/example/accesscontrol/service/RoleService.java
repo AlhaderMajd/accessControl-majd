@@ -1,9 +1,7 @@
 package com.example.accesscontrol.service;
 
-import com.example.accesscontrol.dto.CreateRoleRequest;
-import com.example.accesscontrol.dto.CreateRoleResponse;
-import com.example.accesscontrol.dto.GetRolesResponse;
-import com.example.accesscontrol.dto.RoleResponse;
+import com.example.accesscontrol.dto.*;
+import com.example.accesscontrol.entity.Permission;
 import com.example.accesscontrol.entity.Role;
 import com.example.accesscontrol.entity.RolePermission;
 import com.example.accesscontrol.exception.DuplicateResourceException;
@@ -24,6 +22,7 @@ import java.util.stream.Collectors;
 public class RoleService {
 
     private final RoleRepository roleRepository;
+    private final PermissionService permissionService;
     private final RolePermissionService rolePermissionService;
 
 
@@ -114,6 +113,27 @@ public class RoleService {
                 .roles(roles)
                 .page(page)
                 .total(rolePage.getTotalElements())
+                .build();
+    }
+
+    public RoleWithPermissionsResponse getRoleWithPermissions(Long roleId) {
+        Role role = roleRepository.findById(roleId)
+                .orElseThrow(() -> new ResourceNotFoundException("Role not found"));
+
+        List<Permission> permissions = permissionService.getPermissionsByRoleId(roleId);
+
+        List<PermissionResponse> permissionResponses = permissions.stream()
+                .map(p -> {
+                    PermissionResponse dto = new PermissionResponse();
+                    dto.setId(p.getId());
+                    dto.setName(p.getName());
+                    return dto;
+                }).toList();
+
+        return RoleWithPermissionsResponse.builder()
+                .id(role.getId())
+                .name(role.getName())
+                .permissions(permissionResponses)
                 .build();
     }
 

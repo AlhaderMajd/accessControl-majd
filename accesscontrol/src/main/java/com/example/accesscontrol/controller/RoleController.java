@@ -3,6 +3,7 @@ package com.example.accesscontrol.controller;
 import com.example.accesscontrol.dto.CreateRoleRequest;
 import com.example.accesscontrol.dto.CreateRoleResponse;
 import com.example.accesscontrol.dto.GetRolesResponse;
+import com.example.accesscontrol.dto.RoleWithPermissionsResponse;
 import com.example.accesscontrol.service.RoleService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -32,4 +33,10 @@ public class RoleController {
     ) {
         return roleService.getRoles(search, page, size);
     }
+
+    @GetMapping("/{roleId}")
+    public RoleWithPermissionsResponse getRoleById(@PathVariable Long roleId) {
+        return roleService.getRoleWithPermissions(roleId);
+    }
+
 }
