@@ -26,4 +26,15 @@ public class GroupService {
                 .orElseThrow(() -> new ResourceNotFoundException("Group not found"));
     }
 
+    public void getByIdsOrThrow(List<Long> groupIds) {
+        List<Long> existingIds = groupRepository.findAllById(groupIds)
+                .stream()
+                .map(Group::getId)
+                .toList();
+
+        if (existingIds.size() != groupIds.size()) {
+            throw new ResourceNotFoundException("Some groups not found");
+        }
+    }
+
 }

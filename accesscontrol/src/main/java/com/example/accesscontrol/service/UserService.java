@@ -25,7 +25,7 @@ public class UserService {
     private final UserRoleService userRoleService;
     private final RoleService roleService;
     private final UserGroupService userGroupService;
-
+    private final GroupService groupService;
     @PersistenceContext
     private EntityManager em;
 
@@ -209,6 +209,21 @@ public class UserService {
         return userGroupService.assignUsersToGroups(request);
     }
 
+    public DeassignUsersFromGroupsResponse deassignUsersFromGroups(DeassignUsersFromGroupsRequest request) {
+        List<Long> userIds = request.getUserIds();
+        List<Long> groupIds = request.getGroupIds();
+
+        if (userIds == null || userIds.isEmpty() || groupIds == null || groupIds.isEmpty()) {
+            throw new IllegalArgumentException("User or group list is invalid");
+        }
+
+        // Validate users and groups exist
+        getByIdsOrThrow(userIds);
+        groupService.getByIdsOrThrow(groupIds);
+
+        // Delegate deletion
+        return userGroupService.deassignUsersFromGroups(request);
+    }
 
 
     public List<User> getByIdsOrThrow(List<Long> userIds) {

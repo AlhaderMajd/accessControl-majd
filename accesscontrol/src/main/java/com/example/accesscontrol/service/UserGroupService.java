@@ -2,10 +2,13 @@ package com.example.accesscontrol.service;
 
 import com.example.accesscontrol.dto.AssignUsersToGroupsRequest;
 import com.example.accesscontrol.dto.AssignUsersToGroupsResponse;
+import com.example.accesscontrol.dto.DeassignUsersFromGroupsRequest;
+import com.example.accesscontrol.dto.DeassignUsersFromGroupsResponse;
 import com.example.accesscontrol.entity.Group;
 import com.example.accesscontrol.entity.UserGroup;
 import com.example.accesscontrol.exception.ResourceNotFoundException;
 import com.example.accesscontrol.repository.UserGroupRepository;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -39,6 +42,18 @@ public class UserGroupService {
                 .assignedCount(assignedCount)
                 .build();
     }
+
+    @Transactional
+    public DeassignUsersFromGroupsResponse deassignUsersFromGroups(DeassignUsersFromGroupsRequest request) {
+        int deletedCount = userGroupRepository.deleteByUserIdInAndGroupIdIn(
+                request.getUserIds(), request.getGroupIds());
+
+        return DeassignUsersFromGroupsResponse.builder()
+                .message("Users deassigned from groups successfully")
+                .removedCount(deletedCount)
+                .build();
+    }
+
 
     public List<String> getGroupNamesByUserId(Long userId) {
         List<UserGroup> userGroups = userGroupRepository.findByUserId(userId);
