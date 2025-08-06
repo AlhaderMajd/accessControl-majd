@@ -1,11 +1,14 @@
 package com.example.accesscontrol.controller;
 
 import com.example.accesscontrol.dto.*;
+import com.example.accesscontrol.exception.InvalidCredentialsException;
 import com.example.accesscontrol.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/users")
@@ -42,5 +45,23 @@ public class UserController {
             return ResponseEntity.badRequest().body(null);
         }
     }
+
+    @PutMapping("/change-password")
+    public ResponseEntity<Map<String, String>> changePassword(@RequestBody ChangePasswordRequest request) {
+        try {
+            userService.changePassword(request);
+            return ResponseEntity.ok(Map.of("message", "Password updated successfully"));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (InvalidCredentialsException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            e.printStackTrace(); // 🔍 log the exact error in console
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Failed to update password"));
+        }
+
+    }
+
 
 }

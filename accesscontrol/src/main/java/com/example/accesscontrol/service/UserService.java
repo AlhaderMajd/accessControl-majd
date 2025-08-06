@@ -4,6 +4,7 @@ import com.example.accesscontrol.dto.*;
 import com.example.accesscontrol.entity.Role;
 import com.example.accesscontrol.entity.User;
 import com.example.accesscontrol.exception.DuplicateEmailException;
+import com.example.accesscontrol.exception.InvalidCredentialsException;
 import com.example.accesscontrol.exception.ResourceNotFoundException;
 import com.example.accesscontrol.exception.UserNotFoundException;
 import com.example.accesscontrol.repository.UserRepository;
@@ -11,6 +12,8 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.TypedQuery;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -107,6 +110,28 @@ public class UserService {
                 .groups(groups)
                 .build();
     }
+
+    public void changePassword(ChangePasswordRequest request) {
+        if (!isValidPassword(request.getNewPassword())) {
+            throw new IllegalArgumentException("Password must meet security requirements");
+        }
+
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        if (!(principal instanceof User)) {
+            throw new RuntimeException("Unexpected principal type: " + principal.getClass().getName());
+        }
+
+        User user = (User) principal;
+
+        if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
+            throw new InvalidCredentialsException("Old password is incorrect");
+        }
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+    }
+
 
     public User getByEmailOrThrow(String email) {
         return userRepository.findByEmail(email)
