@@ -62,7 +62,7 @@ public class RoleController {
     }
 
 
-    @PostMapping("/deassign-permissions")
+    @DeleteMapping("/deassign-permissions")
     public ResponseEntity<?> deassignPermissions(@RequestBody List<AssignPermissionsToRolesItem> items) {
         try {
             String message = roleService.deassignPermissionsFromRoles(items);
@@ -75,5 +75,6 @@ public class RoleController {
             return ResponseEntity.internalServerError().body(Map.of("message", "Failed to remove permissions"));
         }
     }
+
 
 }

@@ -6,7 +6,6 @@ import com.example.accesscontrol.repository.RolePermissionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -28,22 +27,17 @@ public class RolePermissionService {
                 idsToInsert.add(new RolePermissionId(roleId, permissionId));
             }
         }
-
         List<RolePermissionId> existing = rolePermissionRepository.findAllById(idsToInsert)
                 .stream()
                 .map(rp -> new RolePermissionId(rp.getRoleId(), rp.getPermissionId()))
                 .toList();
-
         idsToInsert.removeAll(existing);
-
         if (idsToInsert.isEmpty()) {
             return 0;
         }
-
         List<RolePermission> toSave = idsToInsert.stream()
                 .map(id -> new RolePermission(id.getRoleId(), id.getPermissionId()))
                 .toList();
-
         rolePermissionRepository.saveAll(toSave);
         return toSave.size();
     }

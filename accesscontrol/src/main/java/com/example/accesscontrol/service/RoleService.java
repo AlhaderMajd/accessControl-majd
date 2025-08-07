@@ -169,8 +169,9 @@ public class RoleService {
         }
 
         int inserted = rolePermissionService.assignPermissionsToRoles(existingRoleIds, existingPermissionIds);
+
         if (inserted == 0) {
-            throw new IllegalStateException("Failed to assign permissions");
+            return "No new permissions were assigned (all already exist)";
         }
 
         return "Permissions assigned successfully";
@@ -203,6 +204,11 @@ public class RoleService {
             throw new IllegalStateException("Failed to remove permissions");
         }
 
+        int deleted = rolePermissionService.deassignPermissionsFromRoles(existingRoleIds, existingPermissionIds);
+
+        if ( deleted > 0) {
+            return "No new permissions were deassigned";
+        }
         return "Permissions removed successfully";
     }
 
