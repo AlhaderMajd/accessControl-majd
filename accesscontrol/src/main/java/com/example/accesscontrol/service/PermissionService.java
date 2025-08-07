@@ -18,12 +18,11 @@ public class PermissionService {
         return permissionRepository.findByRoleId(roleId);
     }
 
-    public List<Permission> getByIdsOrThrow(List<Long> ids) {
-        List<Permission> permissions = permissionRepository.findAllById(ids);
-        if (permissions.size() != ids.size()) {
-            throw new ResourceNotFoundException("Some permissions not found");
-        }
-        return permissions;
+    public List<Long> getExistingPermissionIds(List<Long> permissionIds) {
+        return permissionRepository.findAllById(permissionIds)
+                .stream()
+                .map(Permission::getId)
+                .toList();
     }
 
 }

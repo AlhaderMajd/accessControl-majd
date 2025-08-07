@@ -1,9 +1,9 @@
 package com.example.accesscontrol.service;
 
 import com.example.accesscontrol.dto.*;
-import com.example.accesscontrol.entity.Permission;
 import com.example.accesscontrol.entity.Role;
 import com.example.accesscontrol.entity.RolePermission;
+import com.example.accesscontrol.entity.Permission;
 import com.example.accesscontrol.exception.DuplicateResourceException;
 import com.example.accesscontrol.exception.ResourceNotFoundException;
 import com.example.accesscontrol.repository.RoleRepository;
@@ -12,10 +12,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -25,7 +23,6 @@ public class RoleService {
     private final RoleRepository roleRepository;
     private final PermissionService permissionService;
     private final RolePermissionService rolePermissionService;
-
 
     public Role getOrCreateRole(String roleName) {
         return roleRepository.findByName(roleName)
@@ -61,10 +58,9 @@ public class RoleService {
             throw new DuplicateResourceException("Some role names already exist: " + existingNames);
         }
 
-        List<Role> roles = new ArrayList<>();
-        for (CreateRoleRequest req : requests) {
-            roles.add(Role.builder().name(req.getName()).build());
-        }
+        List<Role> roles = requests.stream()
+                .map(req -> Role.builder().name(req.getName()).build())
+                .collect(Collectors.toList());
 
         roleRepository.saveAll(roles);
 
@@ -75,8 +71,8 @@ public class RoleService {
         for (CreateRoleRequest req : requests) {
             if (req.getPermissionIds() != null && !req.getPermissionIds().isEmpty()) {
                 Long roleId = nameToId.get(req.getName());
-                for (Long permId : req.getPermissionIds()) {
-                    rolePermissions.add(new RolePermission(roleId, permId));
+                for (Long permissionId : req.getPermissionIds()) {
+                    rolePermissions.add(new RolePermission(roleId, permissionId));
                 }
             }
         }
@@ -102,12 +98,10 @@ public class RoleService {
         Page<Role> rolePage = roleRepository.findByNameContainingIgnoreCase(search, pageable);
 
         List<RoleResponse> roles = rolePage.getContent().stream()
-                .map(role -> {
-                    RoleResponse dto = new RoleResponse();
-                    dto.setId(role.getId());
-                    dto.setName(role.getName());
-                    return dto;
-                })
+                .map(role -> RoleResponse.builder()
+                        .id(role.getId())
+                        .name(role.getName())
+                        .build())
                 .toList();
 
         return GetRolesResponse.builder()
@@ -124,12 +118,11 @@ public class RoleService {
         List<Permission> permissions = permissionService.getPermissionsByRoleId(roleId);
 
         List<PermissionResponse> permissionResponses = permissions.stream()
-                .map(p -> {
-                    PermissionResponse dto = new PermissionResponse();
-                    dto.setId(p.getId());
-                    dto.setName(p.getName());
-                    return dto;
-                }).toList();
+                .map(p -> PermissionResponse.builder()
+                        .id(p.getId())
+                        .name(p.getName())
+                        .build())
+                .toList();
 
         return RoleWithPermissionsResponse.builder()
                 .id(role.getId())
@@ -157,41 +150,61 @@ public class RoleService {
                 .message("Role name updated successfully")
                 .build();
     }
-
-    public AssignPermissionsToRolesResponse assignPermissionsToRoles(List<AssignPermissionsToRolesItem> request) {
-        if (request == null || request.isEmpty()) {
+    public String assignPermissionsToRoles(List<AssignPermissionsToRolesItem> items) {
+        if (items == null || items.isEmpty()) {
             throw new IllegalArgumentException("Invalid or empty input");
         }
 
-        Set<Long> roleIds = request.stream()
-                .map(AssignPermissionsToRolesItem::getRoleId)
+        Set<Long> roleIds = items.stream().map(AssignPermissionsToRolesItem::getRoleId).collect(Collectors.toSet());
+        Set<Long> permissionIds = items.stream()
+                .flatMap(i -> i.getPermissionIds().stream())
                 .collect(Collectors.toSet());
 
-        Set<Long> permissionIds = request.stream()
-                .flatMap(r -> r.getPermissionIds().stream())
-                .collect(Collectors.toSet());
+        List<Long> existingRoleIds = roleRepository.findAllById(roleIds).stream()
+                .map(Role::getId).toList();
+        List<Long> existingPermissionIds = permissionService.getExistingPermissionIds(permissionIds.stream().toList());
 
-        // Validate roles and permissions
-        List<Role> roles = getByIdsOrThrow(new ArrayList<>(roleIds));
-        List<Permission> permissions = permissionService.getByIdsOrThrow(new ArrayList<>(permissionIds));
-
-        List<RolePermission> toInsert = new ArrayList<>();
-        for (AssignPermissionsToRolesItem item : request) {
-            for (Long permId : item.getPermissionIds()) {
-                toInsert.add(new RolePermission(item.getRoleId(), permId));
-            }
+        if (existingRoleIds.size() != roleIds.size() || existingPermissionIds.size() != permissionIds.size()) {
+            throw new NoSuchElementException("One or more role or permission IDs are invalid");
         }
 
-        try {
-            rolePermissionService.saveAll(toInsert);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to assign permissions");
+        int inserted = rolePermissionService.assignPermissionsToRoles(existingRoleIds, existingPermissionIds);
+        if (inserted == 0) {
+            throw new IllegalStateException("Failed to assign permissions");
         }
 
-        return AssignPermissionsToRolesResponse.builder()
-                .message("Permissions assigned successfully")
-                .assignedCount(toInsert.size())
-                .rolesUpdated(roleIds.size())
-                .build();
+        return "Permissions assigned successfully";
     }
+
+
+    public String deassignPermissionsFromRoles(List<AssignPermissionsToRolesItem> items) {
+        if (items == null || items.isEmpty()) {
+            throw new IllegalArgumentException("Invalid or empty input");
+        }
+
+        Set<Long> roleIds = items.stream().map(AssignPermissionsToRolesItem::getRoleId).collect(Collectors.toSet());
+        Set<Long> permissionIds = items.stream()
+                .flatMap(i -> i.getPermissionIds().stream())
+                .collect(Collectors.toSet());
+
+        List<Long> existingRoleIds = roleRepository.findAllById(roleIds)
+                .stream()
+                .map(Role::getId)
+                .toList();
+
+        List<Long> existingPermissionIds = permissionService.getExistingPermissionIds(permissionIds.stream().toList());
+
+        if (existingRoleIds.size() != roleIds.size() || existingPermissionIds.size() != permissionIds.size()) {
+            throw new NoSuchElementException("One or more role or permission IDs are invalid");
+        }
+
+        int deletedCount = rolePermissionService.deassignPermissionsFromRoles(existingRoleIds, existingPermissionIds);
+        if (deletedCount == 0) {
+            throw new IllegalStateException("Failed to remove permissions");
+        }
+
+        return "Permissions removed successfully";
+    }
+
+
 }

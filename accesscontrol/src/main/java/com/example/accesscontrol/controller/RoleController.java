@@ -1,7 +1,6 @@
 package com.example.accesscontrol.controller;
 
 import com.example.accesscontrol.dto.*;
-import com.example.accesscontrol.exception.ResourceNotFoundException;
 import com.example.accesscontrol.service.RoleService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import com.example.accesscontrol.dto.AssignPermissionsToRolesItem;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 @RestController
 @RequestMapping("/api/roles")
@@ -48,18 +48,32 @@ public class RoleController {
     }
 
     @PostMapping("/assign-permissions")
-    public ResponseEntity<?> assignPermissionsToRoles(@Valid @RequestBody List<AssignPermissionsToRolesItem> items) {
+    public ResponseEntity<?> assignPermissions(@RequestBody List<AssignPermissionsToRolesItem> items) {
         try {
-            AssignPermissionsToRolesResponse response = roleService.assignPermissionsToRoles(items);
-            return ResponseEntity.ok(response);
+            String message = roleService.assignPermissionsToRoles(items);
+            return ResponseEntity.ok(Map.of("message", message));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
-        } catch (ResourceNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(404).body(Map.of("message", e.getMessage()));
         } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("message", "Failed to assign permissions"));
+            return ResponseEntity.internalServerError().body(Map.of("message", "Failed to assign permissions"));
         }
     }
+
+
+    @PostMapping("/deassign-permissions")
+    public ResponseEntity<?> deassignPermissions(@RequestBody List<AssignPermissionsToRolesItem> items) {
+        try {
+            String message = roleService.deassignPermissionsFromRoles(items);
+            return ResponseEntity.ok(Map.of("message", message));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(404).body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("message", "Failed to remove permissions"));
+        }
+    }
+
 }
