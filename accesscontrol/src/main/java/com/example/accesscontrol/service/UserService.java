@@ -1,6 +1,7 @@
 package com.example.accesscontrol.service;
 
 import com.example.accesscontrol.dto.*;
+import com.example.accesscontrol.entity.Group;
 import com.example.accesscontrol.entity.Role;
 import com.example.accesscontrol.entity.User;
 import com.example.accesscontrol.exception.*;
@@ -13,12 +14,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+
 import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class UserService {
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserRoleService userRoleService;
@@ -26,15 +29,13 @@ public class UserService {
     private final UserGroupService userGroupService;
     private final GroupService groupService;
 
+
     @PersistenceContext
     private EntityManager em;
 
     public BulkCreateUsersResponse createUsers(BulkCreateUsersRequest request) {
         List<CreateUserRequest> users = request.getUsers();
-
-        if (users == null || users.isEmpty()) {
-            throw new IllegalArgumentException("User list cannot be empty");
-        }
+        if (users == null || users.isEmpty()) throw new IllegalArgumentException("User list cannot be empty");
 
         for (CreateUserRequest user : users) {
             if (!isValidEmail(user.getEmail()) || !isValidPassword(user.getPassword())) {
@@ -59,7 +60,6 @@ public class UserService {
         }).toList();
 
         List<User> savedUsers = userRepository.saveAll(userEntities);
-
         Role memberRole = roleService.getOrCreateRole("MEMBER");
 
         for (User savedUser : savedUsers) {
@@ -77,9 +77,9 @@ public class UserService {
         query.setFirstResult(page * size);
         query.setMaxResults(size);
 
-        List<UserDto> users = query.getResultList().stream().map(user ->
-                new UserDto(user.getId(), user.getEmail(), user.isEnabled())
-        ).collect(Collectors.toList());
+        List<UserDto> users = query.getResultList().stream()
+                .map(user -> new UserDto(user.getId(), user.getEmail(), user.isEnabled()))
+                .toList();
 
         long total = em.createQuery("SELECT COUNT(u) FROM User u WHERE u.email LIKE :search", Long.class)
                 .setParameter("search", "%" + search + "%")
@@ -89,9 +89,7 @@ public class UserService {
     }
 
     public UserDetailsResponse getUserDetails(Long id) {
-        if (id == null || id <= 0) {
-            throw new IllegalArgumentException("Invalid user ID");
-        }
+        if (id == null || id <= 0) throw new IllegalArgumentException("Invalid user ID");
 
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
@@ -114,12 +112,9 @@ public class UserService {
         }
 
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-
-        if (!(principal instanceof User)) {
+        if (!(principal instanceof User user)) {
             throw new RuntimeException("Unexpected principal type: " + principal.getClass().getName());
         }
-
-        User user = (User) principal;
 
         if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
             throw new InvalidCredentialsException("Old password is incorrect");
@@ -131,24 +126,15 @@ public class UserService {
 
     public void changeEmail(UpdateEmailRequest request) {
         String newEmail = request.getNewEmail();
-
-        if (!isValidEmail(newEmail)) {
-            throw new IllegalArgumentException("Invalid email format");
-        }
-
-        if (emailExists(newEmail)) {
-            throw new EmailAlreadyUsedException("Email already taken");
-        }
+        if (!isValidEmail(newEmail)) throw new IllegalArgumentException("Invalid email format");
+        if (emailExists(newEmail)) throw new EmailAlreadyUsedException("Email already taken");
 
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-
-        if (!(principal instanceof User)) {
+        if (!(principal instanceof User user)) {
             throw new RuntimeException("Unexpected principal type");
         }
 
-        User user = (User) principal;
         user.setEmail(newEmail);
-
         userRepository.save(user);
     }
 
@@ -161,15 +147,9 @@ public class UserService {
         }
 
         List<User> users = userRepository.findAllById(userIds);
+        if (users.isEmpty()) throw new ResourceNotFoundException("No users found to update");
 
-        if (users.isEmpty()) {
-            throw new ResourceNotFoundException("No users found to update");
-        }
-
-        for (User user : users) {
-            user.setEnabled(enabled);
-        }
-
+        users.forEach(user -> user.setEnabled(enabled));
         List<User> updatedUsers = userRepository.saveAll(users);
 
         return UpdateUserStatusResponse.builder()
@@ -199,6 +179,7 @@ public class UserService {
                 .assignedCount(assignedCount)
                 .build();
     }
+
     public DeassignRolesResponse deassignRolesFromUsers(DeassignRolesRequest request) {
         List<User> users = getByIdsOrThrow(request.getUserIds());
         List<Role> roles = roleService.getByIdsOrThrow(request.getRoleIds());
@@ -212,39 +193,30 @@ public class UserService {
     public DeassignUsersFromGroupsResponse deassignUsersFromGroups(DeassignUsersFromGroupsRequest request) {
         List<Long> userIds = request.getUserIds();
         List<Long> groupIds = request.getGroupIds();
-
         if (userIds == null || userIds.isEmpty() || groupIds == null || groupIds.isEmpty()) {
             throw new IllegalArgumentException("User or group list is invalid");
         }
 
-        // Validate users and groups exist
         getByIdsOrThrow(userIds);
         groupService.getByIdsOrThrow(groupIds);
-
-        // Delegate deletion
         return userGroupService.deassignUsersFromGroups(request);
     }
 
     @Transactional
     public DeleteUsersResponse deleteUsers(DeleteUsersRequest request) {
         List<Long> userIds = request.getUserIds();
-
         if (userIds == null || userIds.isEmpty()) {
             throw new IllegalArgumentException("User ID list is invalid");
         }
 
-        // Check existence
         List<User> users = userRepository.findAllById(userIds);
         if (users.size() != userIds.size()) {
             throw new ResourceNotFoundException("Some users not found");
         }
 
         try {
-            // Delete relations
             userRoleService.deleteByUserIds(userIds);
             userGroupService.deleteByUserIds(userIds);
-
-            // Delete users
             userRepository.deleteAllById(userIds);
 
             return DeleteUsersResponse.builder()
@@ -256,12 +228,9 @@ public class UserService {
         }
     }
 
-
     public List<User> getByIdsOrThrow(List<Long> userIds) {
         List<User> users = userRepository.findAllById(userIds);
-        if (users.size() != userIds.size()) {
-            throw new ResourceNotFoundException("Some users not found");
-        }
+        if (users.size() != userIds.size()) throw new ResourceNotFoundException("Some users not found");
         return users;
     }
 

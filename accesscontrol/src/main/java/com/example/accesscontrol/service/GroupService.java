@@ -1,7 +1,5 @@
 package com.example.accesscontrol.service;
 
-import com.example.accesscontrol.dto.AssignUsersToGroupsRequest;
-import com.example.accesscontrol.dto.AssignUsersToGroupsResponse;
 import com.example.accesscontrol.entity.Group;
 import com.example.accesscontrol.exception.ResourceNotFoundException;
 import com.example.accesscontrol.repository.GroupRepository;
@@ -26,15 +24,12 @@ public class GroupService {
                 .orElseThrow(() -> new ResourceNotFoundException("Group not found"));
     }
 
-    public void getByIdsOrThrow(List<Long> groupIds) {
-        List<Long> existingIds = groupRepository.findAllById(groupIds)
-                .stream()
-                .map(Group::getId)
-                .toList();
-
-        if (existingIds.size() != groupIds.size()) {
+    public List<Group> getByIdsOrThrow(List<Long> ids) {
+        List<Group> groups = groupRepository.findAllById(ids);
+        if (groups.size() != ids.size()) {
             throw new ResourceNotFoundException("Some groups not found");
         }
+        return groups;
     }
 
 }

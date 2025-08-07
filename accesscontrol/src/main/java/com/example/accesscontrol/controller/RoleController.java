@@ -76,5 +76,33 @@ public class RoleController {
         }
     }
 
+    @PostMapping("/groups/assign-roles")
+    public ResponseEntity<?> assignRolesToGroups(@RequestBody List<AssignRolesToGroupsItem> items) {
+        try {
+            String message = roleService.assignRolesToGroups(items);
+            return ResponseEntity.ok(Map.of("message", message));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(404).body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("message", "Failed to assign roles to groups"));
+        }
+    }
+
+    @DeleteMapping("/groups/deassign-roles")
+    public ResponseEntity<?> deassignRolesFromGroups(@RequestBody List<AssignRolesToGroupsItem> items) {
+        try {
+            String message = roleService.deassignRolesFromGroups(items);
+            return ResponseEntity.ok(Map.of("message", message));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(404).body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("message", "Failed to deassign roles from groups"));
+        }
+    }
+
 
 }

@@ -1,18 +1,17 @@
 package com.example.accesscontrol.service;
 
+import org.apache.commons.lang3.tuple.Pair; // ✅ Correct one
 import com.example.accesscontrol.dto.*;
-import com.example.accesscontrol.entity.Role;
-import com.example.accesscontrol.entity.RolePermission;
-import com.example.accesscontrol.entity.Permission;
+import com.example.accesscontrol.entity.*;
 import com.example.accesscontrol.exception.DuplicateResourceException;
 import com.example.accesscontrol.exception.ResourceNotFoundException;
 import com.example.accesscontrol.repository.RoleRepository;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -23,6 +22,8 @@ public class RoleService {
     private final RoleRepository roleRepository;
     private final PermissionService permissionService;
     private final RolePermissionService rolePermissionService;
+    private final GroupRoleService groupRoleService;
+    private final GroupService groupService;
 
     public Role getOrCreateRole(String roleName) {
         return roleRepository.findByName(roleName)
@@ -210,6 +211,67 @@ public class RoleService {
             return "No new permissions were deassigned";
         }
         return "Permissions removed successfully";
+    }
+
+    @Transactional
+    public String assignRolesToGroups(List<AssignRolesToGroupsItem> items) {
+        if (items == null || items.isEmpty()) {
+            throw new IllegalArgumentException("Invalid or empty input");
+        }
+
+        Set<Long> groupIds = items.stream().map(AssignRolesToGroupsItem::getGroupId).collect(Collectors.toSet());
+        Set<Long> roleIds = items.stream().flatMap(i -> i.getRoleIds().stream()).collect(Collectors.toSet());
+
+        // Validate input
+        List<Long> validGroupIds = groupService.getByIdsOrThrow(groupIds.stream().toList())
+                .stream().map(Group::getId).toList();
+        List<Long> validRoleIds = getByIdsOrThrow(roleIds.stream().toList())
+                .stream().map(Role::getId).toList();
+
+        // Flatten input into group-role pairs
+        Set<Pair<Long, Long>> requestedPairs = new HashSet<>();
+        for (AssignRolesToGroupsItem item : items) {
+            Long groupId = item.getGroupId();
+            for (Long roleId : item.getRoleIds()) {
+                requestedPairs.add(Pair.of(groupId, roleId));
+            }
+        }
+
+        // Use GroupRoleService instead of direct repository access
+        Set<Pair<Long, Long>> existingPairs = groupRoleService.getAllGroupRolePairs();
+
+        Set<Pair<Long, Long>> toInsert = requestedPairs.stream()
+                .filter(pair -> !existingPairs.contains(pair))
+                .collect(Collectors.toSet());
+
+        // Create entities to insert
+        List<GroupRole> newEntities = toInsert.stream().map(pair -> {
+            GroupRole gr = new GroupRole();
+            gr.setGroupId(pair.getLeft());
+            gr.setRoleId(pair.getRight());
+            return gr;
+        }).toList();
+
+        groupRoleService.saveAll(newEntities); // ✅ delegate save
+
+        return "Roles assigned to groups successfully. Inserted: " + newEntities.size();
+    }
+
+
+
+    public String deassignRolesFromGroups(List<AssignRolesToGroupsItem> items) {
+        if (items == null || items.isEmpty()) {
+            throw new IllegalArgumentException("Invalid or empty input");
+        }
+
+        Set<Long> groupIds = items.stream().map(AssignRolesToGroupsItem::getGroupId).collect(Collectors.toSet());
+        Set<Long> roleIds = items.stream().flatMap(i -> i.getRoleIds().stream()).collect(Collectors.toSet());
+
+        groupService.getByIdsOrThrow(new ArrayList<>(groupIds));
+        List<Long> validRoleIds = getByIdsOrThrow(new ArrayList<>(roleIds)).stream().map(Role::getId).toList();
+
+        groupRoleService.deassignRolesFromGroups(new ArrayList<>(groupIds), validRoleIds);
+        return "Roles deassigned from groups successfully";
     }
 
 
