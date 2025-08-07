@@ -44,13 +44,13 @@ public class GroupRoleService {
     }
 
     @Transactional
-    public int deassignRolesFromGroups(List<Long> groupIds, List<Long> roleIds) {
-        groupRoleRepository.deleteAllByGroupIdInAndRoleIdIn(
-                new HashSet<>(groupIds),
-                new HashSet<>(roleIds)
-        );
-        return groupIds.size() * roleIds.size(); // estimate
+    public void deassignRolesFromGroups(List<Long> groupIds, List<Long> roleIds, Set<Pair<Long, Long>> exactPairs) {
+        List<GroupRoleId> idsToDelete = exactPairs.stream()
+                .map(pair -> new GroupRoleId(pair.getLeft(), pair.getRight()))
+                .toList();
+        groupRoleRepository.deleteAllById(idsToDelete);
     }
+
 
     public Set<Pair<Long, Long>> getAllGroupRolePairs() {
         return groupRoleRepository.findAll().stream()

@@ -268,11 +268,15 @@ public class RoleService {
         Set<Long> roleIds = items.stream().flatMap(i -> i.getRoleIds().stream()).collect(Collectors.toSet());
 
         groupService.getByIdsOrThrow(new ArrayList<>(groupIds));
-        List<Long> validRoleIds = getByIdsOrThrow(new ArrayList<>(roleIds)).stream().map(Role::getId).toList();
+        getByIdsOrThrow(new ArrayList<>(roleIds));
 
-        groupRoleService.deassignRolesFromGroups(new ArrayList<>(groupIds), validRoleIds);
+        Set<Pair<Long, Long>> exactPairs = items.stream()
+                .flatMap(item -> item.getRoleIds().stream()
+                        .map(roleId -> Pair.of(item.getGroupId(), roleId)))
+                .collect(Collectors.toSet());
+
+        groupRoleService.deassignRolesFromGroups(new ArrayList<>(groupIds), new ArrayList<>(roleIds), exactPairs);
         return "Roles deassigned from groups successfully";
     }
-
 
 }
