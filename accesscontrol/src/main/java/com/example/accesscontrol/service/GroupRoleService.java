@@ -64,5 +64,9 @@ public class GroupRoleService {
         groupRoleRepository.saveAll(groupRoles);
     }
 
+    @Transactional
+    public void deleteByRoleIds(List<Long> roleIds) {
+        groupRoleRepository.deleteAllByRoleIdIn(roleIds);
+    }
 
 }

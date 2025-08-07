@@ -104,5 +104,21 @@ public class RoleController {
         }
     }
 
+    @DeleteMapping
+    public ResponseEntity<?> deleteRoles(@RequestBody Map<String, List<Long>> request) {
+        try {
+            List<Long> roleIds = request.get("roleIds");
 
+            if (roleIds == null || roleIds.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "No role IDs provided"));
+            }
+
+            String message = roleService.deleteRoles(roleIds);
+            return ResponseEntity.ok(Map.of("message", message));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(404).body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("message", "Failed to delete roles"));
+        }
+    }
 }

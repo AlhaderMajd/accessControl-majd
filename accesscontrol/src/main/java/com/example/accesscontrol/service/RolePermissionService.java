@@ -59,4 +59,10 @@ public class RolePermissionService {
         return idsToDelete.size();
 
     }
+
+    @Transactional
+    public void deleteByRoleIds(List<Long> roleIds) {
+        rolePermissionRepository.deleteAllByRoleIdIn(roleIds);
+    }
+
 }

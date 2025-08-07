@@ -5,10 +5,11 @@ import com.example.accesscontrol.entity.Role;
 import com.example.accesscontrol.entity.User;
 import com.example.accesscontrol.entity.UserRole;
 import com.example.accesscontrol.repository.UserRoleRepository;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import java.util.List;
-import java.util.Set;
+
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -16,21 +17,14 @@ import java.util.stream.Collectors;
 public class UserRoleService {
 
     private final UserRoleRepository userRoleRepository;
-    private final RoleService roleService;
 
     public List<String> getRoleNamesByUserId(Long userId) {
-        List<UserRole> userRoles = userRoleRepository.findByUserId(userId);
-
-        return userRoles.stream()
-                .map(ur -> roleService.getByIdOrThrow(ur.getRoleId()))
-                .map(Role::getName)
-                .collect(Collectors.toList());
+        return userRoleRepository.findRoleNamesByUserId(userId);
     }
 
     public Role assignRoleToUser(Long userId, String roleName) {
-        Role role = roleService.getOrCreateRole(roleName);
-        userRoleRepository.save(new UserRole(userId, role.getId()));
-        return role;
+        // You can optionally keep this logic if you really need RoleService here, but it will reintroduce circular dependency.
+        throw new UnsupportedOperationException("This method requires RoleService and should be avoided to prevent circular dependencies.");
     }
 
     public int assignRolesToUsers(List<Long> userIds, List<Long> roleIds) {
@@ -65,4 +59,8 @@ public class UserRoleService {
         userRoleRepository.deleteByUserIdIn(userIds);
     }
 
+    @Transactional
+    public void deleteByRoleIds(List<Long> roleIds) {
+        userRoleRepository.deleteAllByRoleIdIn(roleIds);
+    }
 }

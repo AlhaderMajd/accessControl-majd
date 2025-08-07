@@ -24,6 +24,7 @@ public class RoleService {
     private final RolePermissionService rolePermissionService;
     private final GroupRoleService groupRoleService;
     private final GroupService groupService;
+    private final UserRoleService  userRoleService;
 
     public Role getOrCreateRole(String roleName) {
         return roleRepository.findByName(roleName)
@@ -252,7 +253,7 @@ public class RoleService {
             return gr;
         }).toList();
 
-        groupRoleService.saveAll(newEntities); // ✅ delegate save
+        groupRoleService.saveAll(newEntities);
 
         return "Roles assigned to groups successfully. Inserted: " + newEntities.size();
     }
@@ -277,6 +278,33 @@ public class RoleService {
 
         groupRoleService.deassignRolesFromGroups(new ArrayList<>(groupIds), new ArrayList<>(roleIds), exactPairs);
         return "Roles deassigned from groups successfully";
+    }
+
+    @Transactional
+    public String deleteRoles(List<Long> roleIds) {
+        if (roleIds == null || roleIds.isEmpty()) {
+            throw new IllegalArgumentException("No role IDs provided");
+        }
+
+        List<Long> existingIds = roleRepository.findAllById(roleIds)
+                .stream().map(Role::getId).toList();
+
+        if (existingIds.size() != roleIds.size()) {
+            throw new NoSuchElementException("One or more role IDs do not exist");
+        }
+
+        // Delete associations
+        rolePermissionService.deleteByRoleIds(roleIds);
+        groupRoleService.deleteByRoleIds(roleIds);
+
+        userRoleService.deleteByRoleIds(roleIds);
+        try {
+            roleRepository.deleteAllById(roleIds);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to delete roles");
+        }
+
+        return "Roles deleted successfully";
     }
 
 }

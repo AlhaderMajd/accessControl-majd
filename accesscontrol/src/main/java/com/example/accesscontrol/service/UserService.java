@@ -1,7 +1,6 @@
 package com.example.accesscontrol.service;
 
 import com.example.accesscontrol.dto.*;
-import com.example.accesscontrol.entity.Group;
 import com.example.accesscontrol.entity.Role;
 import com.example.accesscontrol.entity.User;
 import com.example.accesscontrol.exception.*;
@@ -14,9 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -25,10 +22,9 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserRoleService userRoleService;
-    private final RoleService roleService;
     private final UserGroupService userGroupService;
     private final GroupService groupService;
-
+    private final RoleService  roleService;
 
     @PersistenceContext
     private EntityManager em;
@@ -253,5 +249,10 @@ public class UserService {
 
     private boolean isValidPassword(String password) {
         return password != null && password.length() >= 6;
+    }
+
+    @Transactional
+    public void cleanupRolesFromUsers(List<Long> roleIds) {
+        userRoleService.deleteByRoleIds(roleIds);
     }
 }
