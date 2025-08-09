@@ -1,10 +1,7 @@
 package com.example.accesscontrol.service;
 
 import com.example.accesscontrol.dto.common.PageResponse;
-import com.example.accesscontrol.dto.group.CreateGroupItem;
-import com.example.accesscontrol.dto.group.CreateGroupsResponse;
-import com.example.accesscontrol.dto.group.GroupDetailsResponse;
-import com.example.accesscontrol.dto.group.GroupResponse;
+import com.example.accesscontrol.dto.group.*;
 import com.example.accesscontrol.dto.role.RoleResponse;
 import com.example.accesscontrol.dto.user.UserSummaryResponse;
 import com.example.accesscontrol.entity.Group;
@@ -28,9 +25,7 @@ public class GroupService {
     private final UserService userService;
     private final RoleService roleService;
 
-    public Optional<Group> findById(Long id) {
-        return groupRepository.findById(id);
-    }
+    public Optional<Group> findById(Long id) { return groupRepository.findById(id); }
 
     public Group getByIdOrThrow(Long id) {
         return groupRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Group not found"));
@@ -40,6 +35,11 @@ public class GroupService {
         List<Group> groups = groupRepository.findAllById(ids);
         if (groups.size() != ids.size()) throw new ResourceNotFoundException("Some groups not found");
         return groups;
+    }
+
+    /** Helper for DIP-friendly cross-service existence checks */
+    public List<Long> getExistingIds(List<Long> ids) {
+        return groupRepository.findAllById(ids).stream().map(Group::getId).toList();
     }
 
     @Transactional
@@ -73,14 +73,14 @@ public class GroupService {
     }
 
     @Transactional
-    public com.example.accesscontrol.dto.group.UpdateGroupNameResponse updateGroupName(Long groupId, com.example.accesscontrol.dto.group.UpdateGroupNameRequest request) {
+    public UpdateGroupNameResponse updateGroupName(Long groupId, UpdateGroupNameRequest request) {
         String newName = request.getName();
         if (newName == null || newName.isBlank()) throw new IllegalArgumentException("Invalid or missing group name");
         Group group = getByIdOrThrow(groupId);
         String old = group.getName();
         group.setName(newName.trim());
         groupRepository.save(group);
-        return com.example.accesscontrol.dto.group.UpdateGroupNameResponse.builder()
+        return UpdateGroupNameResponse.builder()
                 .message("Group name updated successfully").id(group.getId()).oldName(old).newName(group.getName()).build();
     }
 
@@ -88,7 +88,7 @@ public class GroupService {
     public com.example.accesscontrol.dto.common.MessageResponse deleteGroups(List<Long> groupIds) {
         if (groupIds == null || groupIds.isEmpty()) throw new IllegalArgumentException("Invalid or empty group IDs list");
         var existingIds = groupRepository.findAllById(groupIds).stream().map(Group::getId).toList();
-        if (existingIds.isEmpty()) throw new com.example.accesscontrol.exception.ResourceNotFoundException("No matching groups found");
+        if (existingIds.isEmpty()) throw new ResourceNotFoundException("No matching groups found");
         userGroupService.deleteByGroupIds(existingIds);
         groupRoleService.deleteByGroupIds(existingIds);
         groupRepository.deleteAllById(existingIds);

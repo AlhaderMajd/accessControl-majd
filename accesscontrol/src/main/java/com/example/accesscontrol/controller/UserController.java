@@ -1,16 +1,11 @@
 package com.example.accesscontrol.controller;
 
 import com.example.accesscontrol.dto.user.*;
-import com.example.accesscontrol.exception.EmailAlreadyUsedException;
-import com.example.accesscontrol.exception.InvalidCredentialsException;
-import com.example.accesscontrol.exception.ResourceNotFoundException;
 import com.example.accesscontrol.service.UserService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/users")
@@ -19,171 +14,82 @@ public class UserController {
 
     private final UserService userService;
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ResponseEntity<BulkCreateUsersResponse> createUsers(@RequestBody BulkCreateUsersRequest request) {
-        BulkCreateUsersResponse response = userService.createUsers(request);
-        return new ResponseEntity<>(response, HttpStatus.CREATED);
+        var response = userService.createUsers(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping
     public ResponseEntity<GetUsersResponse> getUsers(
             @RequestParam(defaultValue = "") String search,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
-        if (page < 0 || size <= 0) {
-            return ResponseEntity.badRequest().build();
-        }
-
+        if (page < 0 || size <= 0) return ResponseEntity.badRequest().build();
         return ResponseEntity.ok(userService.getUsers(search, page, size));
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/{id}")
     public ResponseEntity<UserDetailsResponse> getUserDetails(@PathVariable Long id) {
-        try {
-            UserDetailsResponse response = userService.getUserDetails(id);
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(null);
-        }
+        return ResponseEntity.ok(userService.getUserDetails(id));
     }
 
     @PutMapping("/change-password")
-    public ResponseEntity<Map<String, String>> changePassword(@RequestBody ChangePasswordRequest request) {
-        try {
-            userService.changePassword(request);
-            return ResponseEntity.ok(Map.of("message", "Password updated successfully"));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
-        } catch (InvalidCredentialsException e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", e.getMessage()));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("message", "Failed to update password"));
-        }
-
+    public ResponseEntity<?> changePassword(@RequestBody ChangePasswordRequest request) {
+        userService.changePassword(request);
+        return ResponseEntity.ok(java.util.Map.of("message", "Password updated successfully"));
     }
 
     @PutMapping("/email")
-    public ResponseEntity<Map<String, String>> changeEmail(@RequestBody UpdateEmailRequest request) {
-        try {
-            userService.changeEmail(request);
-            return ResponseEntity.ok(Map.of("message", "Email updated successfully"));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
-        } catch (EmailAlreadyUsedException e) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", e.getMessage()));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("message", "Failed to update email"));
-        }
+    public ResponseEntity<?> changeEmail(@RequestBody UpdateEmailRequest request) {
+        userService.changeEmail(request);
+        return ResponseEntity.ok(java.util.Map.of("message", "Email updated successfully"));
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/status")
-    public ResponseEntity<?> updateUserStatus(@RequestBody UpdateUserStatusRequest request) {
-        try {
-            UpdateUserStatusResponse response = userService.updateUserStatus(request);
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
-        } catch (ResourceNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("message", "Failed to update user status"));
-        }
+    public ResponseEntity<UpdateUserStatusResponse> updateUserStatus(@RequestBody UpdateUserStatusRequest request) {
+        return ResponseEntity.ok(userService.updateUserStatus(request));
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/roles/assign")
-    public ResponseEntity<?> assignRoles(@RequestBody AssignRolesRequest request) {
-        try {
-            AssignRolesResponse response = userService.assignRolesToUsers(request);
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
-        } catch (ResourceNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("message", "Failed to assign roles"));
-        }
+    public ResponseEntity<AssignRolesResponse> assignRoles(@RequestBody AssignRolesRequest request) {
+        return ResponseEntity.ok(userService.assignRolesToUsers(request));
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/roles/deassign")
-    public ResponseEntity<?> deassignRoles(@RequestBody DeassignRolesRequest request) {
-        try {
-            DeassignRolesResponse response = userService.deassignRolesFromUsers(request);
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
-        } catch (ResourceNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("message", "Failed to deassign roles"));
-        }
+    public ResponseEntity<DeassignRolesResponse> deassignRoles(@RequestBody DeassignRolesRequest request) {
+        return ResponseEntity.ok(userService.deassignRolesFromUsers(request));
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/groups/assign")
-    public ResponseEntity<?> assignUsersToGroups(@RequestBody AssignUsersToGroupsRequest request) {
-        try {
-            AssignUsersToGroupsResponse response = userService.assignUsersToGroups(request);
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
-        } catch (ResourceNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("message", "Failed to assign users to groups"));
-        }
+    public ResponseEntity<AssignUsersToGroupsResponse> assignUsersToGroups(@RequestBody AssignUsersToGroupsRequest request) {
+        return ResponseEntity.ok(userService.assignUsersToGroups(request));
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/groups/deassign")
-    public ResponseEntity<?> deassignUsersFromGroups(@RequestBody DeassignUsersFromGroupsRequest request) {
-        try {
-            DeassignUsersFromGroupsResponse response = userService.deassignUsersFromGroups(request);
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
-        } catch (ResourceNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("message", "Failed to deassign users from groups"));
-        }
+    public ResponseEntity<DeassignUsersFromGroupsResponse> deassignUsersFromGroups(@RequestBody DeassignUsersFromGroupsRequest request) {
+        return ResponseEntity.ok(userService.deassignUsersFromGroups(request));
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping
     public ResponseEntity<DeleteUsersResponse> deleteUsers(@RequestBody DeleteUsersRequest request) {
-        DeleteUsersResponse response = userService.deleteUsers(request);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(userService.deleteUsers(request));
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/{userId}/credentials")
-    public ResponseEntity<?> updateUserCredentialsByAdmin(
-            @PathVariable Long userId,
-            @RequestBody AdminUpdateCredentialsRequest request) {
-        try {
-            AdminUpdateCredentialsResponse resp = userService.updateCredentialsByAdmin(userId, request);
-            return ResponseEntity.ok(resp);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
-        } catch (EmailAlreadyUsedException e) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", e.getMessage()));
-        } catch (ResourceNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("message", "Failed to update credentials"));
-        }
+    public ResponseEntity<AdminUpdateCredentialsResponse> updateUserCredentialsByAdmin(
+            @PathVariable Long userId, @RequestBody AdminUpdateCredentialsRequest request) {
+        return ResponseEntity.ok(userService.updateCredentialsByAdmin(userId, request));
     }
-
 }

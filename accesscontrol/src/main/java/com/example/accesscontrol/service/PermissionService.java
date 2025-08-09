@@ -4,6 +4,7 @@ import com.example.accesscontrol.dto.common.MessageResponse;
 import com.example.accesscontrol.dto.common.PageResponse;
 import com.example.accesscontrol.dto.permission.*;
 import com.example.accesscontrol.entity.Permission;
+import com.example.accesscontrol.exception.DuplicateResourceException;
 import com.example.accesscontrol.exception.ResourceNotFoundException;
 import com.example.accesscontrol.repository.PermissionRepository;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +25,7 @@ public class PermissionService {
     @Transactional
     public CreatePermissionsResponse createPermissions(CreatePermissionsRequest request) {
         if (request == null || request.getPermissions() == null || request.getPermissions().isEmpty()) {
-            throw new IllegalArgumentException("Permission list must not be empty");
+            throw new DuplicateResourceException("Permission list must not be empty");
         }
 
         List<String> raw = request.getPermissions();
@@ -35,14 +36,14 @@ public class PermissionService {
                 .toList();
 
         if (names.isEmpty()) {
-            throw new IllegalArgumentException("Permission list must not be empty");
+            throw new DuplicateResourceException("Permission list must not be empty");
         }
 
         Set<String> existing = permissionRepository.findByNameInIgnoreCase(names)
                 .stream().map(Permission::getName).collect(Collectors.toSet());
 
         if (!existing.isEmpty()) {
-            throw new IllegalStateException("Permissions already exist: " + existing);
+            throw new DuplicateResourceException("Permissions already exist: " + existing);
         }
 
         List<Permission> toSave = names.stream()

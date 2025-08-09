@@ -4,8 +4,6 @@ import com.example.accesscontrol.dto.user.DeassignRolesResponse;
 import com.example.accesscontrol.entity.Role;
 import com.example.accesscontrol.entity.User;
 import com.example.accesscontrol.entity.UserRole;
-import com.example.accesscontrol.repository.RoleRepository;
-import com.example.accesscontrol.repository.UserRepository;
 import com.example.accesscontrol.repository.UserRoleRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -19,24 +17,22 @@ import java.util.stream.Collectors;
 public class UserRoleService {
 
     private final UserRoleRepository userRoleRepository;
-    private final UserRepository userRepository;
-    private final RoleRepository roleRepository;
 
     public List<String> getRoleNamesByUserId(Long userId) {
         return userRoleRepository.findRoleNamesByUserId(userId);
     }
 
+    /** Expects IDs to be valid. Callers (UserService/RoleService) must validate existence. */
     public int assignRolesToUsers(List<Long> userIds, List<Long> roleIds) {
-        var validUserIds = userRepository.findAllById(userIds).stream().map(User::getId).toList();
-        var validRoleIds = roleRepository.findAllById(roleIds).stream().map(Role::getId).toList();
-        if (validUserIds.isEmpty() || validRoleIds.isEmpty()) return 0;
+        if (userIds == null || userIds.isEmpty() || roleIds == null || roleIds.isEmpty()) return 0;
 
-        var existingPairs = userRoleRepository.findByIdUserIdInAndIdRoleIdIn(validUserIds, validRoleIds);
+        var existingPairs = userRoleRepository.findByIdUserIdInAndIdRoleIdIn(userIds, roleIds);
         Set<String> existingKeys = existingPairs.stream()
-                .map(ur -> ur.getId().getUserId() + "_" + ur.getId().getRoleId()).collect(Collectors.toSet());
+                .map(ur -> ur.getId().getUserId() + "_" + ur.getId().getRoleId())
+                .collect(Collectors.toSet());
 
-        var newAssignments = validUserIds.stream()
-                .flatMap(u -> validRoleIds.stream().map(r -> UserRole.builder().id(new UserRole.Id(u, r)).build()))
+        var newAssignments = userIds.stream()
+                .flatMap(u -> roleIds.stream().map(r -> UserRole.builder().id(new UserRole.Id(u, r)).build()))
                 .filter(ur -> !existingKeys.contains(ur.getId().getUserId() + "_" + ur.getId().getRoleId()))
                 .toList();
 

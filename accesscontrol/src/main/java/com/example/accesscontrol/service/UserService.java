@@ -30,15 +30,20 @@ public class UserService {
     private EntityManager em;
 
     public BulkCreateUsersResponse createUsers(BulkCreateUsersRequest request) {
-        List<CreateUserRequest> users = request.getUsers();
+        var users = request.getUsers();
         if (users == null || users.isEmpty()) throw new IllegalArgumentException("User list cannot be empty");
-        for (CreateUserRequest u : users) if (!isValidEmail(u.getEmail()) || !isValidPassword(u.getPassword())) throw new IllegalArgumentException("Invalid user input");
+        for (var u : users)
+            if (!isValidEmail(u.getEmail()) || !isValidPassword(u.getPassword()))
+                throw new IllegalArgumentException("Invalid user input");
 
-        List<String> emails = users.stream().map(CreateUserRequest::getEmail).toList();
-        List<String> existingEmails = userRepository.findAllByEmailIn(emails).stream().map(User::getEmail).toList();
+        var emails = users.stream().map(CreateUserRequest::getEmail).toList();
+        var existingEmails = userRepository.findAllByEmailIn(emails).stream().map(User::getEmail).toList();
         if (!existingEmails.isEmpty()) throw new DuplicateEmailException("Some emails already in use: " + existingEmails);
 
-        var entities = users.stream().map(u -> User.builder().email(u.getEmail()).password(passwordEncoder.encode(u.getPassword())).enabled(u.isEnabled()).build()).toList();
+        var entities = users.stream()
+                .map(u -> User.builder().email(u.getEmail()).password(passwordEncoder.encode(u.getPassword())).enabled(u.isEnabled()).build())
+                .toList();
+
         var saved = userRepository.saveAll(entities);
         var userIds = saved.stream().map(User::getId).toList();
 
@@ -49,26 +54,36 @@ public class UserService {
     }
 
     public GetUsersResponse getUsers(String search, int page, int size) {
-        String q = search == null ? "" : search;
-        TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE u.email LIKE :s ORDER BY u.id DESC", User.class);
-        query.setParameter("s", "%" + q + "%").setFirstResult(page * size).setMaxResults(size);
-        var users = query.getResultList().stream().map(u -> new UserSummaryResponse(u.getId(), u.getEmail(), u.isEnabled())).toList();
-        long total = em.createQuery("SELECT COUNT(u) FROM User u WHERE u.email LIKE :s", Long.class).setParameter("s", "%" + q + "%").getSingleResult();
+        String q = (search == null) ? "" : search;
+        TypedQuery<User> query = em.createQuery(
+                "SELECT u FROM User u WHERE u.email LIKE :s ORDER BY u.id DESC", User.class);
+        query.setParameter("s", "%" + q + "%")
+                .setFirstResult(page * size)
+                .setMaxResults(size);
+
+        var users = query.getResultList().stream()
+                .map(u -> new UserSummaryResponse(u.getId(), u.getEmail(), u.isEnabled()))
+                .toList();
+
+        long total = em.createQuery("SELECT COUNT(u) FROM User u WHERE u.email LIKE :s", Long.class)
+                .setParameter("s", "%" + q + "%")
+                .getSingleResult();
+
         return new GetUsersResponse(users, page, total);
     }
 
     public UserDetailsResponse getUserDetails(Long id) {
         if (id == null || id <= 0) throw new IllegalArgumentException("Invalid user ID");
         User user = userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        List<String> roles = userRoleService.getRoleNamesByUserId(user.getId());
-        List<String> groups = userGroupService.getGroupNamesByUserId(user.getId());
+        var roles = userRoleService.getRoleNamesByUserId(user.getId());
+        var groups = userGroupService.getGroupNamesByUserId(user.getId());
         return UserDetailsResponse.builder().id(user.getId()).email(user.getEmail()).enabled(user.isEnabled()).roles(roles).groups(groups).build();
     }
 
     public void changePassword(ChangePasswordRequest request) {
         if (!isValidPassword(request.getNewPassword())) throw new IllegalArgumentException("Password must meet security requirements");
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        if (!(principal instanceof User u)) throw new RuntimeException("Unexpected principal type: " + principal.getClass().getName());
+        if (!(principal instanceof User u)) throw new RuntimeException("Unexpected principal type");
         if (!passwordEncoder.matches(request.getOldPassword(), u.getPassword())) throw new InvalidCredentialsException("Old password is incorrect");
         u.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(u);
@@ -85,7 +100,7 @@ public class UserService {
     }
 
     public UpdateUserStatusResponse updateUserStatus(UpdateUserStatusRequest request) {
-        List<Long> userIds = request.getUserIds();
+        var userIds = request.getUserIds();
         Boolean enabled = request.getEnabled();
         if (userIds == null || userIds.isEmpty() || enabled == null) throw new IllegalArgumentException("User list or status flag is missing/invalid");
         var users = userRepository.findAllById(userIds);
@@ -96,11 +111,15 @@ public class UserService {
     }
 
     public AssignRolesResponse assignRolesToUsers(AssignRolesRequest request) {
-        if (request.getUserIds() == null || request.getUserIds().isEmpty() || request.getRoleIds() == null || request.getRoleIds().isEmpty())
+        if (request.getUserIds() == null || request.getUserIds().isEmpty()
+                || request.getRoleIds() == null || request.getRoleIds().isEmpty())
             throw new IllegalArgumentException("User or role list is invalid or empty");
         var users = getByIdsOrThrow(request.getUserIds());
         var roles = roleService.getByIdsOrThrow(request.getRoleIds());
-        int n = userRoleService.assignRolesToUsers(users.stream().map(User::getId).toList(), roles.stream().map(Role::getId).toList());
+        int n = userRoleService.assignRolesToUsers(
+                users.stream().map(User::getId).toList(),
+                roles.stream().map(Role::getId).toList()
+        );
         return AssignRolesResponse.builder().message("Roles assigned successfully").assignedCount(n).build();
     }
 
@@ -115,7 +134,8 @@ public class UserService {
     }
 
     public DeassignUsersFromGroupsResponse deassignUsersFromGroups(DeassignUsersFromGroupsRequest request) {
-        if (request.getUserIds() == null || request.getUserIds().isEmpty() || request.getGroupIds() == null || request.getGroupIds().isEmpty())
+        if (request.getUserIds() == null || request.getUserIds().isEmpty()
+                || request.getGroupIds() == null || request.getGroupIds().isEmpty())
             throw new IllegalArgumentException("User or group list is invalid");
         getByIdsOrThrow(request.getUserIds());
         return userGroupService.deassignUsersFromGroups(request);
@@ -123,7 +143,7 @@ public class UserService {
 
     @Transactional
     public DeleteUsersResponse deleteUsers(DeleteUsersRequest request) {
-        List<Long> userIds = request.getUserIds();
+        var userIds = request.getUserIds();
         if (userIds == null || userIds.isEmpty()) throw new IllegalArgumentException("User ID list is invalid");
         var users = userRepository.findAllById(userIds);
         if (users.size() != userIds.size()) throw new ResourceNotFoundException("Some users not found");
@@ -147,32 +167,32 @@ public class UserService {
         return userRepository.findByEmail(email).isPresent();
     }
 
-    public User save(User user) {
-        return userRepository.save(user);
+    public User save(User user) { return userRepository.save(user); }
+
+    /** Helper for DIP-friendly cross-service existence checks */
+    public List<Long> getExistingIds(List<Long> ids) {
+        return userRepository.findAllById(ids).stream().map(User::getId).toList();
     }
 
     private boolean isValidEmail(String email) {
         return email != null && email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$");
     }
 
-    private boolean isValidPassword(String password) {
-        return password != null && password.length() >= 6;
-    }
-
-    @Transactional
-    public void cleanupRolesFromUsers(List<Long> roleIds) {
-        userRoleService.deleteByRoleIds(roleIds);
-    }
+    private boolean isValidPassword(String password) { return password != null && password.length() >= 6; }
 
     public List<UserSummaryResponse> getUserSummariesByIds(List<Long> userIds) {
         return userRepository.findAllById(userIds).stream()
-                .map(u -> UserSummaryResponse.builder().id(u.getId()).email(u.getEmail()).enabled(u.isEnabled()).build())
+                .map(u -> UserSummaryResponse.builder()
+                        .id(u.getId())
+                        .email(u.getEmail())
+                        .enabled(u.isEnabled())
+                        .build())
                 .toList();
     }
 
+    // in UserService
     public AdminUpdateCredentialsResponse updateCredentialsByAdmin(
-            Long userId,
-            AdminUpdateCredentialsRequest request) {
+            Long userId, AdminUpdateCredentialsRequest request) {
 
         if (request == null ||
                 (!org.springframework.util.StringUtils.hasText(request.getEmail())
@@ -220,5 +240,4 @@ public class UserService {
                 .passwordUpdated(passwordUpdated)
                 .build();
     }
-
 }
