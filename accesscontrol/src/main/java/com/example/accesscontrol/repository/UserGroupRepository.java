@@ -1,15 +1,17 @@
 package com.example.accesscontrol.repository;
 
 import com.example.accesscontrol.entity.UserGroup;
-import com.example.accesscontrol.entity.UserGroupId;
 import org.springframework.data.jpa.repository.JpaRepository;
+
 import java.util.List;
 
-public interface UserGroupRepository extends JpaRepository<UserGroup, UserGroupId> {
-    List<UserGroup> findByUserId(Long userId);
-    List<UserGroup> findByUserIdInAndGroupIdIn(List<Long> userIds, List<Long> groupIds);
-    boolean existsByUserIdAndGroupId(Long userId, Long groupId);
-    int deleteByUserIdInAndGroupIdIn(List<Long> userIds, List<Long> groupIds);
-    void deleteByUserIdIn(List<Long> userIds);
+public interface UserGroupRepository extends JpaRepository<UserGroup, UserGroup.Id> {
+    List<UserGroup> findByIdUserId(Long userId);
+    List<UserGroup> findByIdUserIdInAndIdGroupIdIn(List<Long> userIds, List<Long> groupIds);
+    boolean existsByIdUserIdAndIdGroupId(Long userId, Long groupId);
+    int deleteByIdUserIdInAndIdGroupIdIn(List<Long> userIds, List<Long> groupIds);
+    void deleteByIdUserIdIn(List<Long> userIds);
+    List<UserGroup> findByIdGroupId(Long groupId);
+    void deleteByIdGroupIdIn(List<Long> groupIds);
 
 }

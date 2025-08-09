@@ -1,24 +1,29 @@
 package com.example.accesscontrol.repository;
 
 import com.example.accesscontrol.entity.UserRole;
-import com.example.accesscontrol.entity.UserRoleId;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
-public interface UserRoleRepository extends JpaRepository<UserRole, UserRoleId> {
+public interface UserRoleRepository extends JpaRepository<UserRole, UserRole.Id> {
 
-    List<UserRole> findByUserId(Long userId);
+    List<UserRole> findByIdUserId(Long userId);
 
-    List<UserRole> findByUserIdInAndRoleIdIn(List<Long> userIds, List<Long> roleIds);
+    List<UserRole> findByIdUserIdInAndIdRoleIdIn(List<Long> userIds, List<Long> roleIds);
 
-    int deleteByUserIdInAndRoleIdIn(List<Long> userIds, List<Long> roleIds);
+    int deleteByIdUserIdInAndIdRoleIdIn(List<Long> userIds, List<Long> roleIds);
 
-    void deleteByUserIdIn(List<Long> userIds);
+    void deleteByIdUserIdIn(List<Long> userIds);
 
-    void deleteAllByRoleIdIn(List<Long> roleIds);
+    void deleteAllByIdRoleIdIn(List<Long> roleIds);
 
-    @Query("SELECT r.name FROM Role r JOIN UserRole ur ON ur.roleId = r.id WHERE ur.userId = :userId")
-    List<String> findRoleNamesByUserId(Long userId);
+    @Query("""
+           SELECT r.name
+           FROM Role r
+           JOIN UserRole ur ON ur.id.roleId = r.id
+           WHERE ur.id.userId = :userId
+           """)
+    List<String> findRoleNamesByUserId(@Param("userId") Long userId);
 }

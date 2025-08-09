@@ -1,7 +1,7 @@
 package com.example.accesscontrol.service;
 
-import com.example.accesscontrol.dto.AuthRequest;
-import com.example.accesscontrol.dto.AuthResponse;
+import com.example.accesscontrol.dto.auth.AuthRequest;
+import com.example.accesscontrol.dto.auth.AuthResponse;
 import com.example.accesscontrol.entity.Role;
 import com.example.accesscontrol.entity.User;
 import com.example.accesscontrol.exception.*;
@@ -18,28 +18,17 @@ public class AuthService {
 
     private final UserService userService;
     private final UserRoleService userRoleService;
+    private final RoleService roleService;
     private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
 
     public AuthResponse login(AuthRequest request) {
         User user = userService.getByEmailOrThrow(request.getEmail());
-
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new InvalidCredentialsException();
-        }
-
-        if (!user.isEnabled()) {
-            throw new UserDisabledException();
-        }
-
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) throw new InvalidCredentialsException();
+        if (!user.isEnabled()) throw new UserDisabledException();
         List<String> roles = userRoleService.getRoleNamesByUserId(user.getId());
-
-        if (roles.isEmpty()) {
-            throw new RuntimeException("User has no assigned roles");
-        }
-
+        if (roles.isEmpty()) throw new RuntimeException("User has no assigned roles");
         String token = jwtTokenProvider.generateToken(user.getEmail());
-
         return AuthResponse.builder()
                 .token(token)
                 .userId(user.getId())
@@ -51,7 +40,6 @@ public class AuthService {
         if (!isValidEmail(request.getEmail()) || !isValidPassword(request.getPassword())) {
             throw new IllegalArgumentException("Invalid email or password format");
         }
-
         if (userService.emailExists(request.getEmail())) {
             throw new EmailAlreadyUsedException("Email already in use");
         }
@@ -63,14 +51,14 @@ public class AuthService {
 
         User savedUser = userService.save(newUser);
 
-        Role savedRole = userRoleService.assignRoleToUser(savedUser.getId(), "MEMBER");
+        Role memberRole = roleService.getOrCreateRole("MEMBER");
+        userRoleService.assignRolesToUsers(List.of(savedUser.getId()), List.of(memberRole.getId()));
 
         String token = jwtTokenProvider.generateToken(savedUser.getEmail());
-
         return AuthResponse.builder()
                 .token(token)
                 .userId(savedUser.getId())
-                .roles(List.of(savedRole.getName()))
+                .roles(List.of(memberRole.getName()))
                 .build();
     }
 

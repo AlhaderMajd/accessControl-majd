@@ -1,10 +1,15 @@
 package com.example.accesscontrol.security.jwt;
 
+import com.example.accesscontrol.entity.Role;
+import com.example.accesscontrol.entity.User;
 import com.example.accesscontrol.entity.UserRole;
+import com.example.accesscontrol.repository.RoleRepository;
 import com.example.accesscontrol.repository.UserRepository;
 import com.example.accesscontrol.repository.UserRoleRepository;
-import com.example.accesscontrol.repository.RoleRepository;
-import io.jsonwebtoken.*;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,7 +17,10 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
-import java.util.*;
+import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
+import java.util.Date;
+import java.util.List;
 import java.util.stream.Collectors;
 
 @Component
@@ -20,40 +28,44 @@ import java.util.stream.Collectors;
 public class JwtTokenProvider {
 
     @Value("${jwt.secret}")
-    private String secretKey;
+    private String secret;
+    private SecretKey key;
+
     private final UserRepository userRepository;
     private final UserRoleRepository userRoleRepository;
     private final RoleRepository roleRepository;
 
     @PostConstruct
     protected void init() {
-        secretKey = Base64.getEncoder().encodeToString(secretKey.getBytes());
+        this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
     public String generateToken(String email) {
-        Claims claims = Jwts.claims().setSubject(email);
         Date now = new Date();
-        Date expiry = new Date(now.getTime() + 1000 * 60 * 60); // 1 hour
-
+        Date expiry = new Date(now.getTime() + 1000L * 60 * 60);
+        Claims claims = Jwts.claims().setSubject(email);
         return Jwts.builder()
                 .setClaims(claims)
                 .setIssuedAt(now)
                 .setExpiration(expiry)
-                .signWith(SignatureAlgorithm.HS256, secretKey)
+                .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
     }
 
     public Authentication getAuthentication(String token) {
         String email = getEmailFromToken(token);
 
-        var user = userRepository.findByEmail(email)
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        List<UserRole> userRoles = userRoleRepository.findByUserId(user.getId());
+        List<UserRole> userRoles = userRoleRepository.findByIdUserId(user.getId());
+
         List<String> roleNames = userRoles.stream()
-                .map(userRole -> roleRepository.findById(userRole.getRoleId())
+                .map(ur -> ur.getId().getRoleId())
+                .map(roleId -> roleRepository.findById(roleId)
                         .orElseThrow(() -> new RuntimeException("Role not found")))
-                .map(role -> "ROLE_" + role.getName()) // Spring Security requires "ROLE_" prefix
+                .map(Role::getName)
+                .map(r -> "ROLE_" + r)
                 .toList();
 
         var authorities = roleNames.stream()
@@ -65,14 +77,17 @@ public class JwtTokenProvider {
 
     public boolean validateToken(String token) {
         try {
-            Jwts.parser().setSigningKey(secretKey).parseClaimsJws(token);
+            Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token);
             return true;
-        } catch (JwtException | IllegalArgumentException e) {
+        } catch (Exception e) {
             return false;
         }
     }
 
     public String getEmailFromToken(String token) {
-        return Jwts.parser().setSigningKey(secretKey).parseClaimsJws(token).getBody().getSubject();
+        return Jwts.parserBuilder().setSigningKey(key).build()
+                .parseClaimsJws(token)
+                .getBody()
+                .getSubject();
     }
 }

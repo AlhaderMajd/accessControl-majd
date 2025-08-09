@@ -2,20 +2,31 @@ package com.example.accesscontrol.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import java.io.Serializable;
 
 @Entity
-@Table(name = "group_roles")
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-@IdClass(GroupRoleId.class)
+@Table(name = "group_roles",
+        uniqueConstraints = @UniqueConstraint(name = "uk_group_roles_group_role", columnNames = {"group_id", "role_id"}),
+        indexes = {
+                @Index(name = "idx_group_roles_group", columnList = "group_id"),
+                @Index(name = "idx_group_roles_role", columnList = "role_id")
+        })
+@Getter @Setter
+@NoArgsConstructor @AllArgsConstructor @Builder
 public class GroupRole {
 
-    @Id
-    @Column(name = "group_id")
-    private Long groupId;
+    @EmbeddedId
+    private Id id;
 
-    @Id
-    @Column(name = "role_id")
-    private Long roleId;
+    @Embeddable
+    @Getter @Setter
+    @NoArgsConstructor @AllArgsConstructor
+    @EqualsAndHashCode
+    public static class Id implements Serializable {
+        @Column(name = "group_id", nullable = false)
+        private Long groupId;
+
+        @Column(name = "role_id", nullable = false)
+        private Long roleId;
+    }
 }

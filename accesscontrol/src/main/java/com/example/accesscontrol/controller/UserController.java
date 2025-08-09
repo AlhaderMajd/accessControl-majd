@@ -1,19 +1,16 @@
 package com.example.accesscontrol.controller;
 
-import com.example.accesscontrol.dto.*;
+import com.example.accesscontrol.dto.user.*;
 import com.example.accesscontrol.exception.EmailAlreadyUsedException;
 import com.example.accesscontrol.exception.InvalidCredentialsException;
 import com.example.accesscontrol.exception.ResourceNotFoundException;
-import com.example.accesscontrol.service.UserGroupService;
 import com.example.accesscontrol.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 
 @RestController
 @RequestMapping("/api/users")
