@@ -166,4 +166,24 @@ public class UserController {
         return ResponseEntity.ok(response);
     }
 
+    @PatchMapping("/{userId}/credentials")
+    public ResponseEntity<?> updateUserCredentialsByAdmin(
+            @PathVariable Long userId,
+            @RequestBody AdminUpdateCredentialsRequest request) {
+        try {
+            AdminUpdateCredentialsResponse resp = userService.updateCredentialsByAdmin(userId, request);
+            return ResponseEntity.ok(resp);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (EmailAlreadyUsedException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", e.getMessage()));
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Failed to update credentials"));
+        }
+    }
+
 }

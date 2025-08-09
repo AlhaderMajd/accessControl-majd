@@ -169,4 +169,56 @@ public class UserService {
                 .map(u -> UserSummaryResponse.builder().id(u.getId()).email(u.getEmail()).enabled(u.isEnabled()).build())
                 .toList();
     }
+
+    public AdminUpdateCredentialsResponse updateCredentialsByAdmin(
+            Long userId,
+            AdminUpdateCredentialsRequest request) {
+
+        if (request == null ||
+                (!org.springframework.util.StringUtils.hasText(request.getEmail())
+                        && !org.springframework.util.StringUtils.hasText(request.getPassword()))) {
+            throw new IllegalArgumentException("At least one of email or password must be provided");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        boolean emailUpdated = false;
+        boolean passwordUpdated = false;
+
+        if (org.springframework.util.StringUtils.hasText(request.getEmail())) {
+            String newEmail = request.getEmail().trim();
+            if (!isValidEmail(newEmail)) {
+                throw new IllegalArgumentException("Invalid email format");
+            }
+            if (!newEmail.equalsIgnoreCase(user.getEmail()) && emailExists(newEmail)) {
+                throw new EmailAlreadyUsedException("Email already in use");
+            }
+            user.setEmail(newEmail);
+            emailUpdated = true;
+        }
+
+        if (org.springframework.util.StringUtils.hasText(request.getPassword())) {
+            String newPwd = request.getPassword();
+            if (!isValidPassword(newPwd)) {
+                throw new IllegalArgumentException("Password must meet security requirements");
+            }
+            user.setPassword(passwordEncoder.encode(newPwd));
+            passwordUpdated = true;
+        }
+
+        if (!emailUpdated && !passwordUpdated) {
+            throw new IllegalArgumentException("Nothing to update");
+        }
+
+        userRepository.save(user);
+
+        return AdminUpdateCredentialsResponse.builder()
+                .message("Credentials updated successfully")
+                .id(user.getId())
+                .emailUpdated(emailUpdated)
+                .passwordUpdated(passwordUpdated)
+                .build();
+    }
+
 }
