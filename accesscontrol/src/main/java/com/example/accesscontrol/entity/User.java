@@ -4,9 +4,8 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "users",
-        uniqueConstraints = @UniqueConstraint(name = "uk_users_email", columnNames = "email"))
-@Getter @Setter
+@Table(name = "users", uniqueConstraints = @UniqueConstraint(name = "uk_users_email", columnNames = "email"))
+@Data
 @NoArgsConstructor @AllArgsConstructor @Builder
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class User {

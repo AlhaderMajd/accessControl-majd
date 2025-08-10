@@ -3,7 +3,6 @@ package com.example.accesscontrol.repository;
 import com.example.accesscontrol.entity.RolePermission;
 import com.example.accesscontrol.entity.RolePermission.Id;
 import org.springframework.data.jpa.repository.JpaRepository;
-
 import java.util.List;
 import java.util.Set;
 

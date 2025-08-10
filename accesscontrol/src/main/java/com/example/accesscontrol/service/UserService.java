@@ -1,6 +1,27 @@
 package com.example.accesscontrol.service;
 
-import com.example.accesscontrol.dto.user.*;
+import com.example.accesscontrol.dto.user.assignRolesToUser.AssignRolesRequest;
+import com.example.accesscontrol.dto.user.assignRolesToUser.AssignRolesResponse;
+import com.example.accesscontrol.dto.user.assignUsersToGroup.AssignUsersToGroupsRequest;
+import com.example.accesscontrol.dto.user.assignUsersToGroup.AssignUsersToGroupsResponse;
+import com.example.accesscontrol.dto.user.createUsers.CreateUserRequest;
+import com.example.accesscontrol.dto.user.createUsers.CreateUsersRequest;
+import com.example.accesscontrol.dto.user.createUsers.CreateUsersResponse;
+import com.example.accesscontrol.dto.user.deassignUsersFromGroups.DeassignUsersFromGroupsRequest;
+import com.example.accesscontrol.dto.user.deassignUsersFromGroups.DeassignUsersFromGroupsResponse;
+import com.example.accesscontrol.dto.user.deassignUsersFromUsers.DeassignRolesRequest;
+import com.example.accesscontrol.dto.user.deassignUsersFromUsers.DeassignRolesResponse;
+import com.example.accesscontrol.dto.user.deleteUsers.DeleteUsersRequest;
+import com.example.accesscontrol.dto.user.deleteUsers.DeleteUsersResponse;
+import com.example.accesscontrol.dto.user.getUsers.GetUsersResponse;
+import com.example.accesscontrol.dto.user.getUsers.UserResponse;
+import com.example.accesscontrol.dto.user.getUsers.UserSummaryResponse;
+import com.example.accesscontrol.dto.user.updateCredentials.AdminUpdateCredentialsRequest;
+import com.example.accesscontrol.dto.user.updateCredentials.AdminUpdateCredentialsResponse;
+import com.example.accesscontrol.dto.user.updateUserInfo.ChangePasswordRequest;
+import com.example.accesscontrol.dto.user.updateUserInfo.UpdateEmailRequest;
+import com.example.accesscontrol.dto.user.updateUserStatus.UpdateUserStatusRequest;
+import com.example.accesscontrol.dto.user.updateUserStatus.UpdateUserStatusResponse;
 import com.example.accesscontrol.entity.Role;
 import com.example.accesscontrol.entity.User;
 import com.example.accesscontrol.exception.*;
@@ -13,7 +34,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-
 import java.util.*;
 
 @Service
@@ -29,7 +49,7 @@ public class UserService {
     @PersistenceContext
     private EntityManager em;
 
-    public BulkCreateUsersResponse createUsers(BulkCreateUsersRequest request) {
+    public CreateUsersResponse createUsers(CreateUsersRequest request) {
         var users = request.getUsers();
         if (users == null || users.isEmpty()) throw new IllegalArgumentException("User list cannot be empty");
         for (var u : users)
@@ -50,7 +70,7 @@ public class UserService {
         Role memberRole = roleService.getOrCreateRole("MEMBER");
         userRoleService.assignRolesToUsers(userIds, List.of(memberRole.getId()));
 
-        return new BulkCreateUsersResponse(userIds, List.of(memberRole.getName()));
+        return new CreateUsersResponse(userIds, List.of(memberRole.getName()));
     }
 
     public GetUsersResponse getUsers(String search, int page, int size) {
@@ -72,12 +92,12 @@ public class UserService {
         return new GetUsersResponse(users, page, total);
     }
 
-    public UserDetailsResponse getUserDetails(Long id) {
+    public UserResponse getUserDetails(Long id) {
         if (id == null || id <= 0) throw new IllegalArgumentException("Invalid user ID");
         User user = userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User not found"));
         var roles = userRoleService.getRoleNamesByUserId(user.getId());
         var groups = userGroupService.getGroupNamesByUserId(user.getId());
-        return UserDetailsResponse.builder().id(user.getId()).email(user.getEmail()).enabled(user.isEnabled()).roles(roles).groups(groups).build();
+        return UserResponse.builder().id(user.getId()).email(user.getEmail()).enabled(user.isEnabled()).roles(roles).groups(groups).build();
     }
 
     public void changePassword(ChangePasswordRequest request) {
@@ -169,7 +189,6 @@ public class UserService {
 
     public User save(User user) { return userRepository.save(user); }
 
-    /** Helper for DIP-friendly cross-service existence checks */
     public List<Long> getExistingIds(List<Long> ids) {
         return userRepository.findAllById(ids).stream().map(User::getId).toList();
     }
@@ -190,7 +209,6 @@ public class UserService {
                 .toList();
     }
 
-    // in UserService
     public AdminUpdateCredentialsResponse updateCredentialsByAdmin(
             Long userId, AdminUpdateCredentialsRequest request) {
 

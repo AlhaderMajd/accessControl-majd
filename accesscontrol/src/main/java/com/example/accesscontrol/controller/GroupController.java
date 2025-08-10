@@ -9,7 +9,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
 
 @RestController
@@ -21,7 +20,7 @@ public class GroupController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
-    public ResponseEntity<CreateGroupsResponse> createGroups(@RequestBody @Valid List<CreateGroupItem> body) {
+    public ResponseEntity<CreateGroupsResponse> createGroups(@RequestBody @Valid List<CreateGroupRequest> body) {
         var resp = groupService.createGroups(body);
         return ResponseEntity.status(HttpStatus.CREATED).body(resp);
     }

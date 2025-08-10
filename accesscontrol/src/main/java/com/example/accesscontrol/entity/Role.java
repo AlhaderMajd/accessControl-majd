@@ -4,9 +4,8 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "roles",
-        uniqueConstraints = @UniqueConstraint(name = "uk_roles_name", columnNames = "name"))
-@Getter @Setter
+@Table(name = "roles", uniqueConstraints = @UniqueConstraint(name = "uk_roles_name", columnNames = "name"))
+@Data
 @NoArgsConstructor @AllArgsConstructor @Builder
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Role {

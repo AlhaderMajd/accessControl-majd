@@ -1,6 +1,6 @@
 package com.example.accesscontrol.service;
 
-import com.example.accesscontrol.dto.user.DeassignRolesResponse;
+import com.example.accesscontrol.dto.user.deassignUsersFromUsers.DeassignRolesResponse;
 import com.example.accesscontrol.entity.Role;
 import com.example.accesscontrol.entity.User;
 import com.example.accesscontrol.entity.UserRole;
@@ -8,7 +8,6 @@ import com.example.accesscontrol.repository.UserRoleRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -22,7 +21,6 @@ public class UserRoleService {
         return userRoleRepository.findRoleNamesByUserId(userId);
     }
 
-    /** Expects IDs to be valid. Callers (UserService/RoleService) must validate existence. */
     public int assignRolesToUsers(List<Long> userIds, List<Long> roleIds) {
         if (userIds == null || userIds.isEmpty() || roleIds == null || roleIds.isEmpty()) return 0;
 

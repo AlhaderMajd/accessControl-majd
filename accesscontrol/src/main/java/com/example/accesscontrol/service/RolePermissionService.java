@@ -5,7 +5,6 @@ import com.example.accesscontrol.repository.RolePermissionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -19,9 +18,6 @@ public class RolePermissionService {
         rolePermissionRepository.saveAll(rolePermissions);
     }
 
-    /**
-     * Expects roleIds & permissionIds to be already validated by the caller.
-     */
     @Transactional
     public int assignPermissionsToRoles(List<Long> roleIds, List<Long> permissionIds) {
         if (roleIds == null || roleIds.isEmpty() || permissionIds == null || permissionIds.isEmpty()) return 0;

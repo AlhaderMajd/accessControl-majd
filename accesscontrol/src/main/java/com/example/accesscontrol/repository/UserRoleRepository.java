@@ -4,12 +4,9 @@ import com.example.accesscontrol.entity.UserRole;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-
 import java.util.List;
 
 public interface UserRoleRepository extends JpaRepository<UserRole, UserRole.Id> {
-
-    List<UserRole> findByIdUserId(Long userId);
 
     List<UserRole> findByIdUserIdInAndIdRoleIdIn(List<Long> userIds, List<Long> roleIds);
 

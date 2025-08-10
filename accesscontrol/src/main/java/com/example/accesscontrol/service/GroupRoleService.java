@@ -9,7 +9,6 @@ import com.example.accesscontrol.repository.RoleRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -77,12 +76,10 @@ public class GroupRoleService {
                 .map(gr -> gr.getId().getRoleId()).toList();
     }
 
-    /** Helper used by callers for existence checks (does not depend on services). */
     public List<Long> getExistingGroupIds(List<Long> groupIds) {
         return groupRepository.findAllById(groupIds).stream().map(Group::getId).toList();
     }
 
-    /** Helper used by callers for existence checks (does not depend on services). */
     public List<Long> getExistingRoleIds(List<Long> roleIds) {
         return roleRepository.findAllById(roleIds).stream().map(Role::getId).toList();
     }

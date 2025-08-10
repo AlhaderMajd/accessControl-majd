@@ -9,7 +9,6 @@ import com.example.accesscontrol.security.jwt.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-
 import java.util.List;
 
 @Service
@@ -47,7 +46,7 @@ public class AuthService {
         User newUser = new User();
         newUser.setEmail(request.getEmail());
         newUser.setPassword(passwordEncoder.encode(request.getPassword()));
-        newUser.setEnabled(true);
+        newUser.setEnabled(false);
 
         User savedUser = userService.save(newUser);
 

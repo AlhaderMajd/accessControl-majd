@@ -2,8 +2,7 @@ package com.example.accesscontrol.dto.auth;
 
 import lombok.*;
 
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class AuthRequest {

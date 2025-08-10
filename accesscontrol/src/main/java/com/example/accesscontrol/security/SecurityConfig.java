@@ -41,9 +41,6 @@ public class SecurityConfig {
                                 "/login", "/oauth2/**"        // form & OAuth2 login endpoints
                         ).permitAll()
 
-                        // Example: allow public GETs to certain resources
-                        .requestMatchers(HttpMethod.GET, "/api/public/**").permitAll()
-
                         // All GET requests under /api/** require authentication
                         .requestMatchers(HttpMethod.GET, "/api/**").authenticated()
 

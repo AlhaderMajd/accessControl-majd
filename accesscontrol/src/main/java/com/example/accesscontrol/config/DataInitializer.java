@@ -7,9 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;
-
 import java.util.*;
-import java.util.stream.IntStream;
 
 @Configuration
 @RequiredArgsConstructor
@@ -31,15 +29,12 @@ public class DataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        // 1) Fixed Roles
         List<Role> roles = ensureFixedRoles();
 
-        // 2) Other base entities
         List<Permission> perms = ensureMinPermissions(MIN_COUNT);
         List<Group> groups = ensureMinGroups(MIN_COUNT);
         List<User> users = ensureMinUsers(MIN_COUNT);
 
-        // 3) Joins
         ensureMinUserRoles(users, roles, MIN_COUNT);
         ensureMinUserGroups(users, groups, MIN_COUNT);
         ensureMinGroupRoles(groups, roles, MIN_COUNT);
@@ -47,8 +42,6 @@ public class DataInitializer implements CommandLineRunner {
 
         System.out.println("✅ DataInitializer completed.");
     }
-
-    /* ------------------------- Base tables ------------------------- */
 
     private List<Role> ensureFixedRoles() {
         List<Role> roles = new ArrayList<>();
@@ -114,8 +107,6 @@ public class DataInitializer implements CommandLineRunner {
         if (!toInsert.isEmpty()) existing.addAll(userRepository.saveAll(toInsert));
         return existing;
     }
-
-    /* ------------------------- Join tables ------------------------- */
 
     private void ensureMinUserRoles(List<User> users, List<Role> roles, int min) {
         long current = userRoleRepository.count();

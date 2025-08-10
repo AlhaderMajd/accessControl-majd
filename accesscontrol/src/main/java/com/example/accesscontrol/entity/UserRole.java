@@ -5,13 +5,12 @@ import lombok.*;
 import java.io.Serializable;
 
 @Entity
-@Table(name = "user_roles",
-        uniqueConstraints = @UniqueConstraint(name = "uk_user_roles_user_role", columnNames = {"user_id", "role_id"}),
+@Table(name = "user_roles", uniqueConstraints = @UniqueConstraint(name = "uk_user_roles_user_role", columnNames = {"user_id", "role_id"}),
         indexes = {
                 @Index(name = "idx_user_roles_user", columnList = "user_id"),
                 @Index(name = "idx_user_roles_role", columnList = "role_id")
         })
-@Getter @Setter
+@Data
 @NoArgsConstructor @AllArgsConstructor @Builder
 public class UserRole {
 
@@ -19,7 +18,7 @@ public class UserRole {
     private Id id;
 
     @Embeddable
-    @Getter @Setter
+    @Data
     @NoArgsConstructor @AllArgsConstructor
     @EqualsAndHashCode
     public static class Id implements Serializable {

@@ -11,7 +11,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -135,13 +134,5 @@ public class PermissionService {
 
     public List<Long> getExistingPermissionIds(List<Long> ids) {
         return permissionRepository.findAllById(ids).stream().map(Permission::getId).toList();
-    }
-
-    public boolean existsByNameIgnoreCase(String name) {
-        return permissionRepository.existsByNameIgnoreCase(name);
-    }
-
-    public List<Permission> findByNameInIgnoreCase(Collection<String> names) {
-        return permissionRepository.findByNameInIgnoreCase(names);
     }
 }

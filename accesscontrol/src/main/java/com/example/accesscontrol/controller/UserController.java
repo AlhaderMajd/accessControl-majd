@@ -1,6 +1,25 @@
 package com.example.accesscontrol.controller;
 
-import com.example.accesscontrol.dto.user.*;
+import com.example.accesscontrol.dto.user.assignRolesToUser.AssignRolesRequest;
+import com.example.accesscontrol.dto.user.assignRolesToUser.AssignRolesResponse;
+import com.example.accesscontrol.dto.user.assignUsersToGroup.AssignUsersToGroupsRequest;
+import com.example.accesscontrol.dto.user.assignUsersToGroup.AssignUsersToGroupsResponse;
+import com.example.accesscontrol.dto.user.createUsers.CreateUsersRequest;
+import com.example.accesscontrol.dto.user.createUsers.CreateUsersResponse;
+import com.example.accesscontrol.dto.user.deassignUsersFromGroups.DeassignUsersFromGroupsRequest;
+import com.example.accesscontrol.dto.user.deassignUsersFromGroups.DeassignUsersFromGroupsResponse;
+import com.example.accesscontrol.dto.user.deassignUsersFromUsers.DeassignRolesRequest;
+import com.example.accesscontrol.dto.user.deassignUsersFromUsers.DeassignRolesResponse;
+import com.example.accesscontrol.dto.user.deleteUsers.DeleteUsersRequest;
+import com.example.accesscontrol.dto.user.deleteUsers.DeleteUsersResponse;
+import com.example.accesscontrol.dto.user.getUsers.GetUsersResponse;
+import com.example.accesscontrol.dto.user.getUsers.UserResponse;
+import com.example.accesscontrol.dto.user.updateCredentials.AdminUpdateCredentialsRequest;
+import com.example.accesscontrol.dto.user.updateCredentials.AdminUpdateCredentialsResponse;
+import com.example.accesscontrol.dto.user.updateUserInfo.ChangePasswordRequest;
+import com.example.accesscontrol.dto.user.updateUserInfo.UpdateEmailRequest;
+import com.example.accesscontrol.dto.user.updateUserStatus.UpdateUserStatusRequest;
+import com.example.accesscontrol.dto.user.updateUserStatus.UpdateUserStatusResponse;
 import com.example.accesscontrol.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.*;
@@ -16,7 +35,7 @@ public class UserController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
-    public ResponseEntity<BulkCreateUsersResponse> createUsers(@RequestBody BulkCreateUsersRequest request) {
+    public ResponseEntity<CreateUsersResponse> createUsers(@RequestBody CreateUsersRequest request) {
         var response = userService.createUsers(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -34,7 +53,7 @@ public class UserController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/{id}")
-    public ResponseEntity<UserDetailsResponse> getUserDetails(@PathVariable Long id) {
+    public ResponseEntity<UserResponse> getUserDetails(@PathVariable Long id) {
         return ResponseEntity.ok(userService.getUserDetails(id));
     }
 

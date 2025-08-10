@@ -1,5 +1,6 @@
 package com.example.accesscontrol.service;
 
+import com.example.accesscontrol.dto.group.AssignRolesToGroupsRequest;
 import com.example.accesscontrol.dto.permission.PermissionResponse;
 import com.example.accesscontrol.dto.role.*;
 import com.example.accesscontrol.entity.*;
@@ -10,7 +11,6 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
-
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -28,17 +28,12 @@ public class RoleService {
         return roleRepository.findByName(roleName).orElseGet(() -> roleRepository.save(Role.builder().name(roleName).build()));
     }
 
-    public Role getByIdOrThrow(Long id) {
-        return roleRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Role not found"));
-    }
-
     public List<Role> getByIdsOrThrow(List<Long> ids) {
         List<Role> roles = roleRepository.findAllById(ids);
         if (roles.size() != ids.size()) throw new ResourceNotFoundException("Some roles not found");
         return roles;
     }
 
-    /** Helper for DIP-friendly cross-service existence checks */
     public List<Long> getExistingIds(List<Long> ids) {
         return roleRepository.findAllById(ids).stream().map(Role::getId).toList();
     }
@@ -78,11 +73,11 @@ public class RoleService {
         return GetRolesResponse.builder().roles(roles).page(page).total(rolePage.getTotalElements()).build();
     }
 
-    public RoleWithPermissionsResponse getRoleWithPermissions(Long roleId) {
+    public RoleDetailsResponse getRoleWithPermissions(Long roleId) {
         Role role = roleRepository.findById(roleId).orElseThrow(() -> new ResourceNotFoundException("Role not found"));
         List<Permission> permissions = permissionService.getPermissionsByRoleId(roleId);
         var permDtos = permissions.stream().map(p -> PermissionResponse.builder().id(p.getId()).name(p.getName()).build()).toList();
-        return RoleWithPermissionsResponse.builder().id(role.getId()).name(role.getName()).permissions(permDtos).build();
+        return RoleDetailsResponse.builder().id(role.getId()).name(role.getName()).permissions(permDtos).build();
     }
 
     public UpdateRoleResponse updateRoleName(Long roleId, UpdateRoleRequest request) {
@@ -93,13 +88,12 @@ public class RoleService {
         return UpdateRoleResponse.builder().message("Role name updated successfully").build();
     }
 
-    public String assignPermissionsToRoles(List<AssignPermissionsToRolesItem> items) {
+    public String assignPermissionsToRoles(List<AssignPermissionsToRolesRequest> items) {
         if (items == null || items.isEmpty()) throw new IllegalArgumentException("Invalid or empty input");
 
-        Set<Long> roleIds = items.stream().map(AssignPermissionsToRolesItem::getRoleId).collect(Collectors.toSet());
+        Set<Long> roleIds = items.stream().map(AssignPermissionsToRolesRequest::getRoleId).collect(Collectors.toSet());
         Set<Long> permIds = items.stream().flatMap(i -> i.getPermissionIds().stream()).collect(Collectors.toSet());
 
-        // validate/existence-check here (RoleService & PermissionService)
         List<Long> validRoleIds = getExistingIds(new ArrayList<>(roleIds));
         List<Long> validPermIds = permissionService.getExistingPermissionIds(new ArrayList<>(permIds));
 
@@ -108,18 +102,18 @@ public class RoleService {
     }
 
 
-    public String deassignPermissionsFromRoles(List<AssignPermissionsToRolesItem> items) {
+    public String deassignPermissionsFromRoles(List<AssignPermissionsToRolesRequest> items) {
         if (items == null || items.isEmpty()) throw new IllegalArgumentException("Invalid or empty input");
-        Set<Long> roleIds = items.stream().map(AssignPermissionsToRolesItem::getRoleId).collect(Collectors.toSet());
+        Set<Long> roleIds = items.stream().map(AssignPermissionsToRolesRequest::getRoleId).collect(Collectors.toSet());
         Set<Long> permissionIds = items.stream().flatMap(i -> i.getPermissionIds().stream()).collect(Collectors.toSet());
         int n = rolePermissionService.deassignPermissionsFromRoles(new ArrayList<>(roleIds), new ArrayList<>(permissionIds));
         return (n > 0) ? "Permissions removed successfully" : "No permissions were removed";
     }
 
     @Transactional
-    public String assignRolesToGroups(List<AssignRolesToGroupsItem> items) {
+    public String assignRolesToGroups(List<AssignRolesToGroupsRequest> items) {
         if (items == null || items.isEmpty()) throw new IllegalArgumentException("Invalid or empty input");
-        Set<Long> groupIds = items.stream().map(AssignRolesToGroupsItem::getGroupId).collect(Collectors.toSet());
+        Set<Long> groupIds = items.stream().map(AssignRolesToGroupsRequest::getGroupId).collect(Collectors.toSet());
         Set<Long> roleIds = items.stream().flatMap(i -> i.getRoleIds().stream()).collect(Collectors.toSet());
         var validGroupIds = groupRoleService.getExistingGroupIds(new ArrayList<>(groupIds));
         var validRoleIds = getByIdsOrThrow(new ArrayList<>(roleIds)).stream().map(Role::getId).toList();
@@ -127,7 +121,7 @@ public class RoleService {
         return "Roles assigned to groups successfully. Inserted: " + inserted;
     }
 
-    public String deassignRolesFromGroups(List<AssignRolesToGroupsItem> items) {
+    public String deassignRolesFromGroups(List<AssignRolesToGroupsRequest> items) {
         if (items == null || items.isEmpty()) throw new IllegalArgumentException("Invalid or empty input");
         var ids = items.stream()
                 .flatMap(it -> it.getRoleIds().stream().map(rid -> new GroupRole.Id(it.getGroupId(), rid)))

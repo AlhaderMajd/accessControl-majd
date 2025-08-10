@@ -1,11 +1,9 @@
 package com.example.accesscontrol.dto.auth;
 
 import lombok.*;
-
 import java.util.List;
 
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder

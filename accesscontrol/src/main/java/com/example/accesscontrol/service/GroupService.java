@@ -3,7 +3,7 @@ package com.example.accesscontrol.service;
 import com.example.accesscontrol.dto.common.PageResponse;
 import com.example.accesscontrol.dto.group.*;
 import com.example.accesscontrol.dto.role.RoleResponse;
-import com.example.accesscontrol.dto.user.UserSummaryResponse;
+import com.example.accesscontrol.dto.user.getUsers.UserSummaryResponse;
 import com.example.accesscontrol.entity.Group;
 import com.example.accesscontrol.exception.ResourceNotFoundException;
 import com.example.accesscontrol.repository.GroupRepository;
@@ -11,7 +11,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -25,27 +24,14 @@ public class GroupService {
     private final UserService userService;
     private final RoleService roleService;
 
-    public Optional<Group> findById(Long id) { return groupRepository.findById(id); }
-
     public Group getByIdOrThrow(Long id) {
         return groupRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Group not found"));
     }
 
-    public List<Group> getByIdsOrThrow(List<Long> ids) {
-        List<Group> groups = groupRepository.findAllById(ids);
-        if (groups.size() != ids.size()) throw new ResourceNotFoundException("Some groups not found");
-        return groups;
-    }
-
-    /** Helper for DIP-friendly cross-service existence checks */
-    public List<Long> getExistingIds(List<Long> ids) {
-        return groupRepository.findAllById(ids).stream().map(Group::getId).toList();
-    }
-
     @Transactional
-    public CreateGroupsResponse createGroups(List<CreateGroupItem> items) {
+    public CreateGroupsResponse createGroups(List<CreateGroupRequest> items) {
         if (items == null || items.isEmpty()) throw new IllegalArgumentException("Group names are required");
-        List<String> names = items.stream().map(CreateGroupItem::getName)
+        List<String> names = items.stream().map(CreateGroupRequest::getName)
                 .map(n -> n == null ? "" : n.trim()).filter(n -> !n.isBlank()).toList();
         if (names.size() != items.size()) throw new IllegalArgumentException("Group names are required");
         var existing = groupRepository.findByNameInIgnoreCase(names).stream().map(Group::getName).collect(Collectors.toSet());
@@ -93,9 +79,5 @@ public class GroupService {
         groupRoleService.deleteByGroupIds(existingIds);
         groupRepository.deleteAllById(existingIds);
         return com.example.accesscontrol.dto.common.MessageResponse.builder().message("Group(s) deleted successfully").build();
-    }
-
-    public List<String> getGroupNamesByUserId(Long userId) {
-        return userGroupService.getGroupNamesByUserId(userId);
     }
 }

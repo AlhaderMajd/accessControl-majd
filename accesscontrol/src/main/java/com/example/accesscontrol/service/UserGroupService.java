@@ -1,9 +1,9 @@
 package com.example.accesscontrol.service;
 
-import com.example.accesscontrol.dto.user.AssignUsersToGroupsRequest;
-import com.example.accesscontrol.dto.user.AssignUsersToGroupsResponse;
-import com.example.accesscontrol.dto.user.DeassignUsersFromGroupsRequest;
-import com.example.accesscontrol.dto.user.DeassignUsersFromGroupsResponse;
+import com.example.accesscontrol.dto.user.assignUsersToGroup.AssignUsersToGroupsRequest;
+import com.example.accesscontrol.dto.user.assignUsersToGroup.AssignUsersToGroupsResponse;
+import com.example.accesscontrol.dto.user.deassignUsersFromGroups.DeassignUsersFromGroupsRequest;
+import com.example.accesscontrol.dto.user.deassignUsersFromGroups.DeassignUsersFromGroupsResponse;
 import com.example.accesscontrol.entity.Group;
 import com.example.accesscontrol.entity.UserGroup;
 import com.example.accesscontrol.repository.GroupRepository;
@@ -12,7 +12,6 @@ import com.example.accesscontrol.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-
 import java.util.List;
 import java.util.stream.Collectors;
 
