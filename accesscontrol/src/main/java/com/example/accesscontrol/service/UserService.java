@@ -24,19 +24,22 @@ import com.example.accesscontrol.dto.user.updateUserStatus.UpdateUserStatusReque
 import com.example.accesscontrol.dto.user.updateUserStatus.UpdateUserStatusResponse;
 import com.example.accesscontrol.entity.Role;
 import com.example.accesscontrol.entity.User;
-import com.example.accesscontrol.exception.*;
+import com.example.accesscontrol.exception.EmailAlreadyUsedException;
+import com.example.accesscontrol.exception.InvalidCredentialsException;
+import com.example.accesscontrol.exception.ResourceNotFoundException;
+import com.example.accesscontrol.exception.UserNotFoundException;
 import com.example.accesscontrol.repository.UserRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.TypedQuery;
-import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.*;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -55,14 +58,15 @@ public class UserService {
         this.em = em;
     }
 
-
     @Transactional
     public CreateUsersResponse createUsers(CreateUsersRequest request) {
         var users = request.getUsers();
         if (users == null || users.isEmpty()) throw new IllegalArgumentException("User list cannot be empty");
-        for (var u : users)
-            if (!isValidEmail(u.getEmail()) || !isValidPassword(u.getPassword()))
+        for (var u : users) {
+            if (!isValidEmail(u.getEmail()) || !isValidPassword(u.getPassword())) {
                 throw new IllegalArgumentException("Invalid user input");
+            }
+        }
 
         var emails = users.stream().map(CreateUserRequest::getEmail).toList();
         var existingEmails = userRepository.findAllByEmailIn(emails).stream().map(User::getEmail).toList();
@@ -140,15 +144,20 @@ public class UserService {
 
     @Transactional
     public void changeEmail(UpdateEmailRequest request) {
-        String newEmail = request.getNewEmail();
-        if (!isValidEmail(newEmail)) throw new IllegalArgumentException("Invalid email format");
-        if (emailExists(newEmail)) throw new EmailAlreadyUsedException("Email already taken");
-
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || auth.getName() == null) {
             throw new InvalidCredentialsException("Unauthenticated");
         }
         User u = getByEmailOrThrow(auth.getName());
+
+        String newEmail = request.getNewEmail();
+        if (!isValidEmail(newEmail)) throw new IllegalArgumentException("Invalid email format");
+
+        // Only treat as taken if it belongs to someone else
+        if (!newEmail.equalsIgnoreCase(u.getEmail()) && emailExists(newEmail)) {
+            throw new EmailAlreadyUsedException("Email already taken");
+        }
+
         u.setEmail(newEmail);
         userRepository.save(u);
     }
@@ -290,11 +299,15 @@ public class UserService {
             if (!isValidEmail(newEmail)) {
                 throw new IllegalArgumentException("Invalid email format");
             }
+            // Block duplicates only when different from current
             if (!newEmail.equalsIgnoreCase(user.getEmail()) && emailExists(newEmail)) {
                 throw new EmailAlreadyUsedException("Email already in use");
             }
-            user.setEmail(newEmail);
-            emailUpdated = true;
+            // Mark updated only if it actually changes (ignore case)
+            if (!newEmail.equalsIgnoreCase(user.getEmail())) {
+                user.setEmail(newEmail);
+                emailUpdated = true;
+            }
         }
 
         if (org.springframework.util.StringUtils.hasText(request.getPassword())) {
