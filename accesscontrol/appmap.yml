@@ -1,5 +1,0 @@
-name: accesscontrol
-packages:
-  - path: com.example.accesscontrol
-language: java
-appmap_dir: tmp/appmap
