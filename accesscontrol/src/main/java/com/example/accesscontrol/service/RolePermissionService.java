@@ -25,12 +25,12 @@ public class RolePermissionService {
 
     @Transactional
     public int assignPermissionsToRoles(List<Long> roleIds, List<Long> permissionIds) {
-        if (roleIds == null || roleIds.isEmpty() || permissionIds == null || permissionIds.isEmpty()) return 0;
+        if (roleIds == null || permissionIds == null || roleIds.isEmpty() || permissionIds.isEmpty()) {
+            return 0;
+        }
 
         var existing = rolePermissionRepository.findByRole_IdInAndPermission_IdIn(roleIds, permissionIds);
-        Set<String> existingKeys = existing.stream()
-                .map(rp -> rp.getRole().getId() + "_" + rp.getPermission().getId())
-                .collect(Collectors.toSet());
+        Set<String> existingKeys = existing.stream().map(rp -> rp.getRole().getId() + "_" + rp.getPermission().getId()).collect(Collectors.toSet());
 
         List<RolePermission> toInsert = new ArrayList<>();
         for (Long rId : roleIds) {

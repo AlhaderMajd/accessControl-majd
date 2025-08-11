@@ -44,6 +44,13 @@ class UserRoleServiceTest {
     }
 
     @Test
+    void assignRolesToUsers_returnsZero_whenInputsEmpty() {
+        assertEquals(0, userRoleService.assignRolesToUsers(List.of(), List.of(1L)));
+        assertEquals(0, userRoleService.assignRolesToUsers(List.of(1L), List.of()));
+        verifyNoInteractions(userRoleRepository);
+    }
+
+    @Test
     void deassignRoles_buildsResponse() {
         when(userRoleRepository.deleteByUser_IdInAndRole_IdIn(anyList(), anyList()))
                 .thenReturn(2);

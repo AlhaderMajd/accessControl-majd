@@ -51,6 +51,11 @@ public class UserService {
     @PersistenceContext
     private EntityManager em;
 
+    void setEntityManager(EntityManager em) {
+        this.em = em;
+    }
+
+
     @Transactional
     public CreateUsersResponse createUsers(CreateUsersRequest request) {
         var users = request.getUsers();

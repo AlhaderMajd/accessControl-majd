@@ -179,6 +179,22 @@ class RoleServiceTest {
     }
 
     @Test
+    void assignPermissionsToRoles_skipsWhenNoExistingIds() {
+        var req = new AssignPermissionsToRolesRequest();
+        req.setRoleId(99L);
+        req.setPermissionIds(List.of(1L));
+
+        // Role does not exist -> nothing to assign
+        when(roleRepository.findAllById(List.of(99L))).thenReturn(List.of());
+
+        String msg = roleService.assignPermissionsToRoles(List.of(req));
+
+        verify(rolePermissionService, never()).assignPermissionsToRoles(anyList(), anyList());
+        assertTrue(msg.contains("0"), "Expected message to indicate 0 assignments but was: " + msg);
+    }
+
+
+    @Test
     void deassignPermissionsFromRoles_success() {
         AssignPermissionsToRolesRequest a = new AssignPermissionsToRolesRequest();
         a.setRoleId(1L);
@@ -245,5 +261,37 @@ class RoleServiceTest {
                 .thenReturn(List.of(Role.builder().id(1L).name("R").build()));
 
         assertEquals(1, roleService.getRoleSummariesByIds(List.of(1L)).size());
+    }
+    
+    @Test
+    void getByIdsOrThrow_success_and_getExistingIds() {
+        when(roleRepository.findAllById(List.of(1L, 2L)))
+                .thenReturn(List.of(Role.builder().id(1L).name("A").build(), Role.builder().id(2L).name("B").build()));
+        assertEquals(2, roleService.getByIdsOrThrow(List.of(1L, 2L)).size());
+        assertEquals(List.of(1L, 2L), roleService.getExistingIds(List.of(1L, 2L)));
+    }
+
+    @Test
+    void assignPermissionsToRoles_invalid_throws() {
+        assertThrows(IllegalArgumentException.class, () -> roleService.assignPermissionsToRoles(List.of()));
+        assertThrows(IllegalArgumentException.class, () -> roleService.assignPermissionsToRoles(null));
+    }
+
+    @Test
+    void deassignRolesFromGroups_invalid_throws() {
+        assertThrows(IllegalArgumentException.class, () -> roleService.deassignRolesFromGroups(List.of()));
+        assertThrows(IllegalArgumentException.class, () -> roleService.deassignRolesFromGroups(null));
+    }
+
+    @Test
+    void assignRolesToGroups_invalid_throws() {
+        assertThrows(IllegalArgumentException.class, () -> roleService.assignRolesToGroups(List.of()));
+        assertThrows(IllegalArgumentException.class, () -> roleService.assignRolesToGroups(null));
+    }
+
+    @Test
+    void deleteRoles_invalid_throws() {
+        assertThrows(IllegalArgumentException.class, () -> roleService.deleteRoles(List.of()));
+        assertThrows(IllegalArgumentException.class, () -> roleService.deleteRoles(null));
     }
 }

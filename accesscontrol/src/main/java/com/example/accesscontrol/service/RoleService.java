@@ -120,18 +120,40 @@ public class RoleService {
     }
 
     @Transactional
-    public String assignPermissionsToRoles(List<AssignPermissionsToRolesRequest> items) {
-        if (items == null || items.isEmpty()) throw new IllegalArgumentException("Invalid or empty input");
+    public String assignPermissionsToRoles(List<AssignPermissionsToRolesRequest> requests) {
+        if (requests == null || requests.isEmpty()) {
+            throw new IllegalArgumentException("Requests cannot be empty");
+        }
 
-        Set<Long> roleIds = items.stream().map(AssignPermissionsToRolesRequest::getRoleId).collect(Collectors.toSet());
-        Set<Long> permIds = items.stream().flatMap(i -> i.getPermissionIds().stream()).collect(Collectors.toSet());
+        // Collect unique roleIds and permIds from incoming requests
+        List<Long> allRoleIds = requests.stream()
+                .map(AssignPermissionsToRolesRequest::getRoleId)
+                .filter(id -> id != null && id > 0)
+                .distinct()
+                .toList();
 
-        List<Long> validRoleIds = getExistingIds(new ArrayList<>(roleIds));
-        List<Long> validPermIds = permissionService.getExistingPermissionIds(new ArrayList<>(permIds));
+        List<Long> allPermissionIds = requests.stream()
+                .flatMap(r -> r.getPermissionIds() != null ? r.getPermissionIds().stream() : java.util.stream.Stream.<Long>empty())
+                .filter(id -> id != null && id > 0)
+                .distinct()
+                .toList();
 
-        int inserted = rolePermissionService.assignPermissionsToRoles(validRoleIds, validPermIds);
-        return (inserted == 0) ? "No new permissions were assigned (all already exist)" : "Permissions assigned successfully";
+        // Resolve existing roles & permissions
+        List<Long> existingRoleIds = roleRepository.findAllById(allRoleIds)
+                .stream().map(Role::getId).toList();
+
+        List<Long> existingPermissionIds = permissionService.getExistingPermissionIds(allPermissionIds);
+
+        // If either side is empty, SKIP the downstream call
+        if (existingRoleIds.isEmpty() || existingPermissionIds.isEmpty()) {
+            return "No permissions assigned (0). No valid roles or permissions found.";
+        }
+
+        // Delegate once with de-duplicated existing IDs
+        int assigned = rolePermissionService.assignPermissionsToRoles(existingRoleIds, existingPermissionIds);
+        return "Permissions assigned successfully. Total assignments: " + assigned;
     }
+
 
     @Transactional
     public String deassignPermissionsFromRoles(List<AssignPermissionsToRolesRequest> items) {

@@ -164,6 +164,12 @@ class PermissionServiceTest {
     }
 
     @Test
+    void deletePermissions_noExisting_throws() {
+        when(permissionRepository.findAllById(List.of(7L))).thenReturn(List.of());
+        assertThrows(ResourceNotFoundException.class, () -> permissionService.deletePermissions(List.of(7L)));
+    }
+
+    @Test
     void queryHelpers() {
         when(permissionRepository.findByRoleId(3L)).thenReturn(List.of());
         when(permissionRepository.findAllById(List.of(1L)))

@@ -22,13 +22,18 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@org.mockito.junit.jupiter.MockitoSettings(strictness = org.mockito.quality.Strictness.LENIENT)
 class UserGroupServiceTest {
 
-    @Mock private UserGroupRepository userGroupRepository;
-    @Mock private UserRepository userRepository;
-    @Mock private GroupRepository groupRepository;
+    @Mock
+    private UserGroupRepository userGroupRepository;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private GroupRepository groupRepository;
 
-    @InjectMocks private UserGroupService userGroupService;
+    @InjectMocks
+    private UserGroupService userGroupService;
 
     @Test
     void assignUsersToGroups_success_skipsExisting() {
@@ -45,6 +50,24 @@ class UserGroupServiceTest {
         assertEquals(1, resp.getAssignedCount());
         verify(userGroupRepository).saveAll(argThat(iter -> (iter instanceof java.util.List) && ((java.util.List<?>) iter).size() == 1));
     }
+
+    @Test
+    void assignUsersToGroups_returnsZero_whenNothingValid() {
+        var req = new AssignUsersToGroupsRequest();
+        req.setUserIds(List.of(1L));
+        req.setGroupIds(List.of(10L));
+
+        lenient().when(userGroupRepository.findByUser_IdInAndGroup_IdIn(anyList(), anyList()))
+                .thenReturn(List.of());
+        lenient().when(userRepository.existsById(anyLong())).thenReturn(false);
+        lenient().when(groupRepository.existsById(anyLong())).thenReturn(false);
+
+        var resp = userGroupService.assignUsersToGroups(req);
+
+        assertEquals(0, resp.getAssignedCount());
+        verify(userGroupRepository, never()).saveAll(any());
+    }
+
 
     @Test
     void deassignUsersFromGroups_success() {
