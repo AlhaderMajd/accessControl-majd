@@ -1,18 +1,23 @@
 package com.example.accesscontrol.repository;
 
 import com.example.accesscontrol.entity.RolePermission;
-import com.example.accesscontrol.entity.RolePermission.Id;
 import org.springframework.data.jpa.repository.JpaRepository;
+
 import java.util.List;
-import java.util.Set;
 
-public interface RolePermissionRepository extends JpaRepository<RolePermission, Id> {
+public interface RolePermissionRepository extends JpaRepository<RolePermission, Long> {
 
-    List<RolePermission> findByIdRoleIdInAndIdPermissionIdIn(List<Long> roleIds, List<Long> permissionIds);
+    // Exists (used in initializer)
+    boolean existsByRole_IdAndPermission_Id(Long roleId, Long permissionId);
 
-    void deleteAllByIdRoleIdInAndIdPermissionIdIn(Set<Long> roleIds, Set<Long> permissionIds);
+    // Used by RolePermissionService.assignPermissionsToRoles
+    List<RolePermission> findByRole_IdInAndPermission_IdIn(List<Long> roleIds, List<Long> permissionIds);
 
-    void deleteAllByIdRoleIdIn(List<Long> roleIds);
+    // Used by RolePermissionService.deassignPermissionsFromRoles
+    int deleteByRole_IdInAndPermission_IdIn(List<Long> roleIds, List<Long> permissionIds);
 
-    void deleteAllByIdPermissionIdIn(List<Long> permissionIds);
+    // Used by RolePermissionService.deleteByRoleIds / deleteByPermissionIds
+    void deleteByRole_IdIn(List<Long> roleIds);
+
+    void deleteByPermission_IdIn(List<Long> permissionIds);
 }

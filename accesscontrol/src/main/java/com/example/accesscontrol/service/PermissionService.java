@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -27,29 +28,21 @@ public class PermissionService {
             throw new DuplicateResourceException("Permission list must not be empty");
         }
 
-        List<String> raw = request.getPermissions();
-        List<String> names = raw.stream()
+        List<String> names = request.getPermissions().stream()
                 .map(n -> n == null ? "" : n.trim())
                 .filter(n -> !n.isBlank())
                 .distinct()
                 .toList();
+        if (names.isEmpty()) throw new DuplicateResourceException("Permission list must not be empty");
 
-        if (names.isEmpty()) {
-            throw new DuplicateResourceException("Permission list must not be empty");
-        }
+        Set<String> existing = permissionRepository.findByNameInIgnoreCase(names).stream()
+                .map(Permission::getName)
+                .collect(Collectors.toSet());
+        if (!existing.isEmpty()) throw new DuplicateResourceException("Permissions already exist: " + existing);
 
-        Set<String> existing = permissionRepository.findByNameInIgnoreCase(names)
-                .stream().map(Permission::getName).collect(Collectors.toSet());
-
-        if (!existing.isEmpty()) {
-            throw new DuplicateResourceException("Permissions already exist: " + existing);
-        }
-
-        List<Permission> toSave = names.stream()
-                .map(n -> Permission.builder().name(n).build())
-                .toList();
-
-        List<Permission> saved = permissionRepository.saveAll(toSave);
+        List<Permission> saved = permissionRepository.saveAll(
+                names.stream().map(n -> Permission.builder().name(n).build()).toList()
+        );
 
         return CreatePermissionsResponse.builder()
                 .message("Permissions created successfully")
@@ -60,26 +53,21 @@ public class PermissionService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
     public PageResponse<PermissionResponse> getPermissions(String search, int page, int size) {
-        if (page < 0 || size <= 0) {
-            throw new IllegalArgumentException("Invalid pagination or search parameters");
-        }
+        if (page < 0 || size <= 0) throw new IllegalArgumentException("Invalid pagination or search parameters");
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
-        String q = (search == null) ? "" : search;
-        Page<Permission> pg = permissionRepository.findByNameContainingIgnoreCase(q, pageable);
+        Page<Permission> pg = permissionRepository.findByNameContainingIgnoreCase(search == null ? "" : search, pageable);
 
         List<PermissionResponse> items = pg.getContent().stream()
                 .map(p -> PermissionResponse.builder().id(p.getId()).name(p.getName()).build())
                 .toList();
 
         return PageResponse.<PermissionResponse>builder()
-                .items(items)
-                .page(page)
-                .size(size)
-                .total(pg.getTotalElements())
-                .build();
+                .items(items).page(page).size(size).total(pg.getTotalElements()).build();
     }
 
+    @Transactional(readOnly = true)
     public PermissionResponse getPermissionDetails(Long permissionId) {
         Permission p = permissionRepository.findById(permissionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Permission not found"));
@@ -92,10 +80,8 @@ public class PermissionService {
         if (newName == null || newName.trim().isEmpty()) {
             throw new IllegalArgumentException("Permission name is required");
         }
-
         Permission p = permissionRepository.findById(permissionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Permission not found"));
-
         String old = p.getName();
         p.setName(newName.trim());
         permissionRepository.save(p);
@@ -113,12 +99,9 @@ public class PermissionService {
         if (permissionIds == null || permissionIds.isEmpty()) {
             throw new IllegalArgumentException("No permission IDs provided");
         }
-
-        List<Long> existing = permissionRepository.findAllById(permissionIds)
-                .stream().map(Permission::getId).toList();
-        if (existing.isEmpty()) {
-            throw new ResourceNotFoundException("No matching permissions found");
-        }
+        List<Long> existing = permissionRepository.findAllById(permissionIds).stream()
+                .map(Permission::getId).toList();
+        if (existing.isEmpty()) throw new ResourceNotFoundException("No matching permissions found");
 
         rolePermissionService.deleteByPermissionIds(existing);
         permissionRepository.deleteAllById(existing);
@@ -128,10 +111,12 @@ public class PermissionService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
     public List<Permission> getPermissionsByRoleId(Long roleId) {
         return permissionRepository.findByRoleId(roleId);
     }
 
+    @Transactional(readOnly = true)
     public List<Long> getExistingPermissionIds(List<Long> ids) {
         return permissionRepository.findAllById(ids).stream().map(Permission::getId).toList();
     }

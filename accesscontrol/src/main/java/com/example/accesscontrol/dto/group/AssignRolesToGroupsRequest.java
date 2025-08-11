@@ -1,12 +1,17 @@
 package com.example.accesscontrol.dto.group;
 
-import lombok.Getter;
-import lombok.Setter;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+import lombok.Data;
+
 import java.util.List;
 
-@Getter
-@Setter
+@Data
 public class AssignRolesToGroupsRequest {
+
+    @NotNull
     private Long groupId;
-    private List<Long> roleIds;
+
+    @NotEmpty
+    private List<@NotNull Long> roleIds;
 }

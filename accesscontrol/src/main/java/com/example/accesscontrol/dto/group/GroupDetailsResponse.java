@@ -6,7 +6,10 @@ import lombok.*;
 
 import java.util.List;
 
-@Data @NoArgsConstructor @AllArgsConstructor @Builder
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class GroupDetailsResponse {
     private Long id;
     private String name;

@@ -3,6 +3,7 @@ package com.example.accesscontrol.controller;
 import com.example.accesscontrol.dto.auth.AuthRequest;
 import com.example.accesscontrol.dto.auth.AuthResponse;
 import com.example.accesscontrol.service.AuthService;
+import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
@@ -14,12 +15,14 @@ public class AuthController {
 
     private final AuthService authService;
 
+    @Operation(summary = "Login with email & password")
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@RequestBody AuthRequest request) {
         AuthResponse response = authService.login(request);
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "Register a new user")
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@RequestBody AuthRequest request) {
         AuthResponse response = authService.register(request);

@@ -9,10 +9,11 @@ import com.example.accesscontrol.entity.UserGroup;
 import com.example.accesscontrol.repository.GroupRepository;
 import com.example.accesscontrol.repository.UserGroupRepository;
 import com.example.accesscontrol.repository.UserRepository;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import java.util.List;
+
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -23,33 +24,44 @@ public class UserGroupService {
     private final UserRepository userRepository;
     private final GroupRepository groupRepository;
 
+    @Transactional
     public AssignUsersToGroupsResponse assignUsersToGroups(AssignUsersToGroupsRequest request) {
-        int assignedCount = 0;
+        if (request.getUserIds() == null || request.getUserIds().isEmpty()
+                || request.getGroupIds() == null || request.getGroupIds().isEmpty()) {
+            return AssignUsersToGroupsResponse.builder().message("Nothing to assign").assignedCount(0).build();
+        }
 
-        for (Long userId : request.getUserIds()) {
-            if (!userRepository.existsById(userId)) continue;
+        var existing = userGroupRepository.findByUser_IdInAndGroup_IdIn(request.getUserIds(), request.getGroupIds());
+        Set<String> existingKeys = existing.stream()
+                .map(ug -> ug.getUser().getId() + "_" + ug.getGroup().getId())
+                .collect(Collectors.toSet());
 
-            for (Long groupId : request.getGroupIds()) {
-                if (!groupRepository.existsById(groupId)) continue;
-
-                boolean exists = userGroupRepository.existsByIdUserIdAndIdGroupId(userId, groupId);
-                if (!exists) {
-                    userGroupRepository.save(UserGroup.builder()
-                            .id(new UserGroup.Id(userId, groupId))
-                            .build());
-                    assignedCount++;
+        List<UserGroup> toInsert = new ArrayList<>();
+        for (Long uId : request.getUserIds()) {
+            if (!userRepository.existsById(uId)) continue;
+            for (Long gId : request.getGroupIds()) {
+                if (!groupRepository.existsById(gId)) continue;
+                String key = uId + "_" + gId;
+                if (!existingKeys.contains(key)) {
+                    UserGroup ug = new UserGroup();
+                    ug.setUser(com.example.accesscontrol.entity.User.builder().id(uId).build());
+                    ug.setGroup(com.example.accesscontrol.entity.Group.builder().id(gId).build());
+                    toInsert.add(ug);
                 }
             }
         }
+
+        if (!toInsert.isEmpty()) userGroupRepository.saveAll(toInsert);
+
         return AssignUsersToGroupsResponse.builder()
                 .message("Users assigned to groups successfully")
-                .assignedCount(assignedCount)
+                .assignedCount(toInsert.size())
                 .build();
     }
 
     @Transactional
     public DeassignUsersFromGroupsResponse deassignUsersFromGroups(DeassignUsersFromGroupsRequest request) {
-        int deletedCount = userGroupRepository.deleteByIdUserIdInAndIdGroupIdIn(
+        int deletedCount = userGroupRepository.deleteByUser_IdInAndGroup_IdIn(
                 request.getUserIds(), request.getGroupIds());
         return DeassignUsersFromGroupsResponse.builder()
                 .message("Users deassigned from groups successfully")
@@ -57,28 +69,33 @@ public class UserGroupService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
     public List<Long> getGroupIdsByUserId(Long userId) {
-        return userGroupRepository.findByIdUserId(userId).stream()
-                .map(ug -> ug.getId().getGroupId())
+        return userGroupRepository.findByUser_Id(userId).stream()
+                .map(ug -> ug.getGroup().getId())
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public List<Long> getUserIdsByGroupId(Long groupId) {
-        return userGroupRepository.findByIdGroupId(groupId).stream()
-                .map(ug -> ug.getId().getUserId())
+        return userGroupRepository.findByGroup_Id(groupId).stream()
+                .map(ug -> ug.getUser().getId())
                 .toList();
     }
 
     @Transactional
     public void deleteByUserIds(List<Long> userIds) {
-        userGroupRepository.deleteByIdUserIdIn(userIds);
+        if (userIds == null || userIds.isEmpty()) return;
+        userGroupRepository.deleteByUser_IdIn(userIds);
     }
 
     @Transactional
     public void deleteByGroupIds(List<Long> groupIds) {
-        userGroupRepository.deleteByIdGroupIdIn(groupIds);
+        if (groupIds == null || groupIds.isEmpty()) return;
+        userGroupRepository.deleteByGroup_IdIn(groupIds);
     }
 
+    @Transactional(readOnly = true)
     public List<String> getGroupNamesByUserId(Long userId) {
         var ids = getGroupIdsByUserId(userId);
         return groupRepository.findAllById(ids).stream()

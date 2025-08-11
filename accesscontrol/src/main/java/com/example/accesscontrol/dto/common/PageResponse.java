@@ -2,6 +2,7 @@ package com.example.accesscontrol.dto.common;
 
 import lombok.Builder;
 import lombok.Data;
+
 import java.util.List;
 
 @Data

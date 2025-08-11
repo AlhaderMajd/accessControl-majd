@@ -2,30 +2,43 @@ package com.example.accesscontrol.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import java.io.Serializable;
 
 @Entity
-@Table(name = "user_roles", uniqueConstraints = @UniqueConstraint(name = "uk_user_roles_user_role", columnNames = {"user_id", "role_id"}),
+@Table(
+        name = "user_roles",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_user_roles_user_role",
+                columnNames = {"user_id", "role_id"}
+        ),
         indexes = {
                 @Index(name = "idx_user_roles_user", columnList = "user_id"),
                 @Index(name = "idx_user_roles_role", columnList = "role_id")
-        })
-@Data
-@NoArgsConstructor @AllArgsConstructor @Builder
+        }
+)
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@ToString(exclude = {"user", "role"})
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class UserRole {
 
-    @EmbeddedId
-    private Id id;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
+    private Long id;
 
-    @Embeddable
-    @Data
-    @NoArgsConstructor @AllArgsConstructor
-    @EqualsAndHashCode
-    public static class Id implements Serializable {
-        @Column(name = "user_id", nullable = false)
-        private Long userId;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false,
+            foreignKey = @ForeignKey(name = "fk_user_roles_user"))
+    private User user;
 
-        @Column(name = "role_id", nullable = false)
-        private Long roleId;
-    }
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "role_id", nullable = false,
+            foreignKey = @ForeignKey(name = "fk_user_roles_role"))
+    private Role role;
+
+    @Version
+    private long version;
 }

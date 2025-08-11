@@ -7,6 +7,6 @@ import lombok.Data;
 @Data
 public class UpdateRoleRequest {
     @NotBlank(message = "Role name must not be blank")
-    @Size(max = 50, message = "Role name must not exceed 50 characters")
+    @Size(max = 100, message = "Role name must not exceed 100 characters")
     private String name;
 }

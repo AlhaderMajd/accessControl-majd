@@ -13,3 +13,12 @@ spring:
 
 jwt:
   secret: mySuperSecureSecretKey1234567890!
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    display-request-duration: true
+    try-it-out-enabled: true
+  api-docs:
+    path: /v3/api-docs
+

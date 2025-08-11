@@ -7,10 +7,11 @@ import com.example.accesscontrol.entity.*;
 import com.example.accesscontrol.exception.DuplicateResourceException;
 import com.example.accesscontrol.exception.ResourceNotFoundException;
 import com.example.accesscontrol.repository.RoleRepository;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
+
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -24,20 +25,25 @@ public class RoleService {
     private final GroupRoleService groupRoleService;
     private final UserRoleService userRoleService;
 
+    @Transactional
     public Role getOrCreateRole(String roleName) {
-        return roleRepository.findByName(roleName).orElseGet(() -> roleRepository.save(Role.builder().name(roleName).build()));
+        return roleRepository.findByName(roleName)
+                .orElseGet(() -> roleRepository.save(Role.builder().name(roleName).build()));
     }
 
+    @Transactional(readOnly = true)
     public List<Role> getByIdsOrThrow(List<Long> ids) {
         List<Role> roles = roleRepository.findAllById(ids);
         if (roles.size() != ids.size()) throw new ResourceNotFoundException("Some roles not found");
         return roles;
     }
 
+    @Transactional(readOnly = true)
     public List<Long> getExistingIds(List<Long> ids) {
         return roleRepository.findAllById(ids).stream().map(Role::getId).toList();
     }
 
+    @Transactional
     public CreateRoleResponse createRoles(List<CreateRoleRequest> requests) {
         if (requests == null || requests.isEmpty()
                 || requests.stream().anyMatch(r -> r.getName() == null || r.getName().isBlank()))
@@ -45,9 +51,12 @@ public class RoleService {
 
         List<String> names = requests.stream().map(CreateRoleRequest::getName).toList();
         List<String> existingNames = roleRepository.findExistingNames(names);
-        if (!existingNames.isEmpty()) throw new DuplicateResourceException("Some role names already exist: " + existingNames);
+        if (!existingNames.isEmpty())
+            throw new DuplicateResourceException("Some role names already exist: " + existingNames);
 
-        var roles = requests.stream().map(req -> Role.builder().name(req.getName()).build()).toList();
+        var roles = requests.stream()
+                .map(req -> Role.builder().name(req.getName()).build())
+                .toList();
         roleRepository.saveAll(roles);
 
         Map<String, Long> nameToId = roles.stream().collect(Collectors.toMap(Role::getName, Role::getId));
@@ -56,38 +65,61 @@ public class RoleService {
             if (req.getPermissionIds() != null && !req.getPermissionIds().isEmpty()) {
                 Long roleId = nameToId.get(req.getName());
                 for (Long pid : req.getPermissionIds()) {
-                    rp.add(RolePermission.builder().id(new RolePermission.Id(roleId, pid)).build());
+                    RolePermission link = new RolePermission();
+                    link.setRole(Role.builder().id(roleId).build());
+                    link.setPermission(Permission.builder().id(pid).build());
+                    rp.add(link);
                 }
             }
         }
         if (!rp.isEmpty()) rolePermissionService.saveAll(rp);
 
-        return CreateRoleResponse.builder().message("Roles created successfully").created(names).build();
+        return CreateRoleResponse.builder()
+                .message("Roles created successfully")
+                .created(names)
+                .build();
     }
 
+    @Transactional(readOnly = true)
     public GetRolesResponse getRoles(String search, int page, int size) {
         if (page < 0 || size <= 0) throw new IllegalArgumentException("Invalid pagination or search parameters");
         Pageable pageable = PageRequest.of(page, size);
-        Page<Role> rolePage = roleRepository.findByNameContainingIgnoreCase(search, pageable);
-        var roles = rolePage.getContent().stream().map(r -> RoleResponse.builder().id(r.getId()).name(r.getName()).build()).toList();
-        return GetRolesResponse.builder().roles(roles).page(page).total(rolePage.getTotalElements()).build();
+        Page<Role> rolePage = roleRepository.findByNameContainingIgnoreCase(search == null ? "" : search, pageable);
+        var roles = rolePage.getContent().stream()
+                .map(r -> RoleResponse.builder().id(r.getId()).name(r.getName()).build())
+                .toList();
+        return GetRolesResponse.builder()
+                .roles(roles)
+                .page(page)
+                .total(rolePage.getTotalElements())
+                .build();
     }
 
+    @Transactional(readOnly = true)
     public RoleDetailsResponse getRoleWithPermissions(Long roleId) {
         Role role = roleRepository.findById(roleId).orElseThrow(() -> new ResourceNotFoundException("Role not found"));
         List<Permission> permissions = permissionService.getPermissionsByRoleId(roleId);
-        var permDtos = permissions.stream().map(p -> PermissionResponse.builder().id(p.getId()).name(p.getName()).build()).toList();
-        return RoleDetailsResponse.builder().id(role.getId()).name(role.getName()).permissions(permDtos).build();
+        var permDtos = permissions.stream()
+                .map(p -> PermissionResponse.builder().id(p.getId()).name(p.getName()).build())
+                .toList();
+        return RoleDetailsResponse.builder()
+                .id(role.getId())
+                .name(role.getName())
+                .permissions(permDtos)
+                .build();
     }
 
+    @Transactional
     public UpdateRoleResponse updateRoleName(Long roleId, UpdateRoleRequest request) {
-        if (request.getName() == null || request.getName().isBlank()) throw new IllegalArgumentException("Invalid role name");
+        if (request.getName() == null || request.getName().isBlank())
+            throw new IllegalArgumentException("Invalid role name");
         Role role = roleRepository.findById(roleId).orElseThrow(() -> new ResourceNotFoundException("Role not found"));
         role.setName(request.getName());
         roleRepository.save(role);
         return UpdateRoleResponse.builder().message("Role name updated successfully").build();
     }
 
+    @Transactional
     public String assignPermissionsToRoles(List<AssignPermissionsToRolesRequest> items) {
         if (items == null || items.isEmpty()) throw new IllegalArgumentException("Invalid or empty input");
 
@@ -101,7 +133,7 @@ public class RoleService {
         return (inserted == 0) ? "No new permissions were assigned (all already exist)" : "Permissions assigned successfully";
     }
 
-
+    @Transactional
     public String deassignPermissionsFromRoles(List<AssignPermissionsToRolesRequest> items) {
         if (items == null || items.isEmpty()) throw new IllegalArgumentException("Invalid or empty input");
         Set<Long> roleIds = items.stream().map(AssignPermissionsToRolesRequest::getRoleId).collect(Collectors.toSet());
@@ -121,12 +153,12 @@ public class RoleService {
         return "Roles assigned to groups successfully. Inserted: " + inserted;
     }
 
+    @Transactional
     public String deassignRolesFromGroups(List<AssignRolesToGroupsRequest> items) {
         if (items == null || items.isEmpty()) throw new IllegalArgumentException("Invalid or empty input");
-        var ids = items.stream()
-                .flatMap(it -> it.getRoleIds().stream().map(rid -> new GroupRole.Id(it.getGroupId(), rid)))
-                .collect(Collectors.toSet());
-        groupRoleService.deassignExactPairs(ids);
+        var groupIds = items.stream().map(AssignRolesToGroupsRequest::getGroupId).distinct().toList();
+        var roleIds = items.stream().flatMap(i -> i.getRoleIds().stream()).distinct().toList();
+        groupRoleService.deassignRolesFromGroups(groupIds, roleIds);
         return "Roles deassigned from groups successfully";
     }
 
@@ -142,6 +174,7 @@ public class RoleService {
         return "Roles deleted successfully";
     }
 
+    @Transactional(readOnly = true)
     public List<RoleResponse> getRoleSummariesByIds(List<Long> roleIds) {
         return roleRepository.findAllById(roleIds).stream()
                 .map(r -> RoleResponse.builder().id(r.getId()).name(r.getName()).build())

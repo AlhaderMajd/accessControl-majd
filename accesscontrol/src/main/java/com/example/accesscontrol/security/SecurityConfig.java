@@ -32,19 +32,16 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // Public endpoints
                         .requestMatchers(
-                                "/api/auth/**",               // login, register, refresh token
-                                "/swagger-ui/**",             // Swagger UI
-                                "/v3/api-docs/**",            // OpenAPI docs
-                                "/css/**", "/js/**", "/images/**", // static resources
-                                "/login", "/oauth2/**"        // form & OAuth2 login endpoints
+                                "/api/auth/**",
+                                "/swagger-ui.html",
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**",
+                                "/v3/api-docs.yaml",
+                                "/css/**", "/js/**", "/images/**",
+                                "/login", "/oauth2/**"
                         ).permitAll()
-
-                        // All GET requests under /api/** require authentication
                         .requestMatchers(HttpMethod.GET, "/api/**").authenticated()
-
-                        // Everything else requires authentication
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
