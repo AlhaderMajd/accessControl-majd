@@ -128,7 +128,7 @@ public class DataInitializer implements CommandLineRunner {
        (use simple IDs + existsByXxx_IdAndYyy_Id)
        ========================= */
 
-    private void ensureMinUserRoles(List<User> users, List<Role> roles, int min) {
+    void ensureMinUserRoles(List<User> users, List<Role> roles, int min) {
         long current = userRoleRepository.count();
         if (current >= min || users.isEmpty() || roles.isEmpty()) return;
 
@@ -150,7 +150,7 @@ public class DataInitializer implements CommandLineRunner {
         if (!toInsert.isEmpty()) userRoleRepository.saveAll(toInsert);
     }
 
-    private void ensureMinUserGroups(List<User> users, List<Group> groups, int min) {
+    void ensureMinUserGroups(List<User> users, List<Group> groups, int min) {
         long current = userGroupRepository.count();
         if (current >= min || users.isEmpty() || groups.isEmpty()) return;
 
@@ -172,7 +172,7 @@ public class DataInitializer implements CommandLineRunner {
         if (!toInsert.isEmpty()) userGroupRepository.saveAll(toInsert);
     }
 
-    private void ensureMinGroupRoles(List<Group> groups, List<Role> roles, int min) {
+    void ensureMinGroupRoles(List<Group> groups, List<Role> roles, int min) {
         long current = groupRoleRepository.count();
         if (current >= min || groups.isEmpty() || roles.isEmpty()) return;
 

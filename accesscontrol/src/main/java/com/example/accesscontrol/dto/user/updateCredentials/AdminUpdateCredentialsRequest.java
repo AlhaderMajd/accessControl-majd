@@ -14,9 +14,4 @@ public class AdminUpdateCredentialsRequest {
 
     @Size(min = 6, max = 255)
     private String password;   // optional
-
-    @AssertTrue(message = "At least one of email or password must be provided")
-    public boolean isAnyProvided() {
-        return (email != null && !email.isBlank()) || (password != null && !password.isBlank());
-    }
 }
