@@ -32,15 +32,12 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        // 1) Seed fixed roles from enum
         List<Role> roles = ensureFixedRoles();
 
-        // 2) Seed minimum base data
         List<Permission> permissions = ensureMinPermissions(MIN_COUNT);
         List<Group> groups = ensureMinGroups(MIN_COUNT);
         List<User> users = ensureMinUsers(MIN_COUNT);
 
-        // 3) Seed association tables to at least MIN_COUNT rows each
         ensureMinUserRoles(users, roles, MIN_COUNT);
         ensureMinUserGroups(users, groups, MIN_COUNT);
         ensureMinGroupRoles(groups, roles, MIN_COUNT);
@@ -48,10 +45,6 @@ public class DataInitializer implements CommandLineRunner {
 
         System.out.println("✅ DataInitializer completed.");
     }
-
-    /* =========================
-       Base data creators
-       ========================= */
 
     private List<Role> ensureFixedRoles() {
         List<Role> out = new ArrayList<>();
@@ -110,11 +103,7 @@ public class DataInitializer implements CommandLineRunner {
         for (int i = 1; i <= min; i++) {
             String email = "user" + i + "@example.com";
             if (!emailsLower.contains(email.toLowerCase(Locale.ROOT))) {
-                toInsert.add(User.builder()
-                        .email(email)
-                        .password(passwordEncoder.encode("123456"))
-                        .enabled(true)
-                        .build());
+                toInsert.add(User.builder().email(email).password(passwordEncoder.encode("123456")).enabled(true).build());
             }
         }
         if (!toInsert.isEmpty()) {
@@ -122,11 +111,6 @@ public class DataInitializer implements CommandLineRunner {
         }
         return existing;
     }
-
-    /* =========================
-       Association creators
-       (use simple IDs + existsByXxx_IdAndYyy_Id)
-       ========================= */
 
     void ensureMinUserRoles(List<User> users, List<Role> roles, int min) {
         long current = userRoleRepository.count();
@@ -140,10 +124,7 @@ public class DataInitializer implements CommandLineRunner {
             Role r = roles.get(i % roles.size());
 
             if (!userRoleRepository.existsByUser_IdAndRole_Id(u.getId(), r.getId())) {
-                toInsert.add(UserRole.builder()
-                        .user(u)
-                        .role(r)
-                        .build());
+                toInsert.add(UserRole.builder().user(u).role(r).build());
             }
         }
 
@@ -162,10 +143,7 @@ public class DataInitializer implements CommandLineRunner {
             Group g = groups.get(i % groups.size());
 
             if (!userGroupRepository.existsByUser_IdAndGroup_Id(u.getId(), g.getId())) {
-                toInsert.add(UserGroup.builder()
-                        .user(u)
-                        .group(g)
-                        .build());
+                toInsert.add(UserGroup.builder().user(u).group(g).build());
             }
         }
 
@@ -184,10 +162,7 @@ public class DataInitializer implements CommandLineRunner {
             Role r = roles.get(i % roles.size());
 
             if (!groupRoleRepository.existsByGroup_IdAndRole_Id(g.getId(), r.getId())) {
-                toInsert.add(GroupRole.builder()
-                        .group(g)
-                        .role(r)
-                        .build());
+                toInsert.add(GroupRole.builder().group(g).role(r).build());
             }
         }
 
@@ -206,10 +181,7 @@ public class DataInitializer implements CommandLineRunner {
             Permission p = perms.get(i % perms.size());
 
             if (!rolePermissionRepository.existsByRole_IdAndPermission_Id(r.getId(), p.getId())) {
-                toInsert.add(RolePermission.builder()
-                        .role(r)
-                        .permission(p)
-                        .build());
+                toInsert.add(RolePermission.builder().role(r).permission(p).build());
             }
         }
 

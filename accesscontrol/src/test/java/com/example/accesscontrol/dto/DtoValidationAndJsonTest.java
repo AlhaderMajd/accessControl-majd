@@ -50,10 +50,9 @@ public class DtoValidationAndJsonTest {
     void authRequest_validation_violationsOnInvalid() {
         AuthRequest dto = new AuthRequest();
         dto.setEmail("not-an-email");
-        dto.setPassword(" "); // blank
+        dto.setPassword(" ");
 
         Set<ConstraintViolation<AuthRequest>> violations = validator.validate(dto);
-        // Should have violations for email format and not blank password
         assertFalse(violations.isEmpty());
         assertTrue(violations.stream().anyMatch(v -> v.getPropertyPath().toString().equals("email")));
         assertTrue(violations.stream().anyMatch(v -> v.getPropertyPath().toString().equals("password")));
@@ -70,20 +69,17 @@ public class DtoValidationAndJsonTest {
         assertEquals("john.doe@example.com", dto.getEmail());
         assertTrue(dto.isEnabled());
 
-        // Now break validation
-        dto.setPassword("123"); // too short
+        dto.setPassword("123");
         Set<ConstraintViolation<CreateUserRequest>> violations = validator.validate(dto);
         assertTrue(violations.stream().anyMatch(v -> v.getPropertyPath().toString().equals("password")));
     }
 
     @Test
     void createUsersRequest_notEmpty_and_nestedValidations() {
-        // Empty list should violate @NotEmpty
         CreateUsersRequest empty = CreateUsersRequest.builder().users(new ArrayList<>()).build();
         Set<ConstraintViolation<CreateUsersRequest>> v1 = validator.validate(empty);
         assertTrue(v1.stream().anyMatch(v -> v.getPropertyPath().toString().equals("users")));
 
-        // Nested invalid email should be caught via @Valid
         CreateUserRequest badUser = CreateUserRequest.builder()
                 .email("bad")
                 .password("secret1")
@@ -91,19 +87,17 @@ public class DtoValidationAndJsonTest {
         CreateUsersRequest nested = CreateUsersRequest.builder().users(List.of(badUser)).build();
         Set<ConstraintViolation<CreateUsersRequest>> v2 = validator.validate(nested);
         assertFalse(v2.isEmpty());
-        // Ensure violation path mentions users
         assertTrue(v2.stream().anyMatch(v -> v.getPropertyPath().toString().startsWith("users")));
     }
 
     @Test
     void assignRolesRequest_notEmpty_and_elementNotNull() {
         AssignRolesRequest dto = new AssignRolesRequest();
-        dto.setUserIds(new java.util.ArrayList<>(java.util.Arrays.asList(1L, null))); // use null-permitting list to trigger @NotNull element constraint
-        dto.setRoleIds(List.of()); // empty list should violate @NotEmpty
+        dto.setUserIds(new java.util.ArrayList<>(java.util.Arrays.asList(1L, null)));
+        dto.setRoleIds(List.of());
 
         Set<ConstraintViolation<AssignRolesRequest>> violations = validator.validate(dto);
         assertFalse(violations.isEmpty());
-        // at least one violation for userIds element and one for roleIds list
         assertTrue(violations.stream().anyMatch(v -> v.getPropertyPath().toString().startsWith("userIds")));
         assertTrue(violations.stream().anyMatch(v -> v.getPropertyPath().toString().equals("roleIds")));
     }
@@ -148,7 +142,6 @@ public class DtoValidationAndJsonTest {
         assertTrue(asMap.containsKey("roles"));
         assertEquals("42", asMap.get("userId").toString());
 
-        // round trip
         AuthResponse back = mapper.readValue(json, AuthResponse.class);
         assertEquals(resp, back);
     }
@@ -156,8 +149,8 @@ public class DtoValidationAndJsonTest {
     @Test
     void createRoleRequest_validation() {
         CreateRoleRequest dto = new CreateRoleRequest();
-        dto.setName(" "); // blank
-        dto.setPermissionIds(null); // optional allowed
+        dto.setName(" ");
+        dto.setPermissionIds(null);
         Set<ConstraintViolation<CreateRoleRequest>> violations = validator.validate(dto);
         assertTrue(violations.stream().anyMatch(v -> v.getPropertyPath().toString().equals("name")));
 
@@ -173,7 +166,7 @@ public class DtoValidationAndJsonTest {
         Set<ConstraintViolation<UpdatePermissionNameRequest>> v1 = validator.validate(dto);
         assertFalse(v1.isEmpty());
 
-        dto.setName("a".repeat(101)); // exceed max 100
+        dto.setName("a".repeat(101));
         Set<ConstraintViolation<UpdatePermissionNameRequest>> v2 = validator.validate(dto);
         assertFalse(v2.isEmpty());
 

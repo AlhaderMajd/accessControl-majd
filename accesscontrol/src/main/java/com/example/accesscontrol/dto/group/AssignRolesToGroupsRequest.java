@@ -8,7 +8,6 @@ import java.util.List;
 
 @Data
 public class AssignRolesToGroupsRequest {
-
     @NotNull
     private Long groupId;
 

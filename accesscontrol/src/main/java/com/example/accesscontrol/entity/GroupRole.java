@@ -15,15 +15,13 @@ import lombok.*;
                 @Index(name = "idx_group_roles_role", columnList = "role_id")
         }
 )
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 @ToString(exclude = {"group", "role"})
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class GroupRole {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @EqualsAndHashCode.Include

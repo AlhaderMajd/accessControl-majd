@@ -8,7 +8,6 @@ import java.util.List;
 
 @Data
 public class DeassignRolesRequest {
-
     @NotEmpty
     private List<@NotNull Long> userIds;
 

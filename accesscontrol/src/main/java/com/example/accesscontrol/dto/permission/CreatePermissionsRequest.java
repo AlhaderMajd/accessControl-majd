@@ -9,9 +9,6 @@ import java.util.List;
 
 @Data
 public class CreatePermissionsRequest {
-
     @NotEmpty
-    private List<
-            @NotBlank @Size(max = 100)
-                    String> permissions;
+    private List<@NotBlank @Size(max = 100) String> permissions;
 }

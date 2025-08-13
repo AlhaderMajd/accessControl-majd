@@ -27,11 +27,7 @@ public class PermissionController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping
-    public PageResponse<PermissionResponse> list(
-            @RequestParam(defaultValue = "") String search,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size
-    ) {
+    public PageResponse<PermissionResponse> list(@RequestParam(defaultValue = "") String search, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size) {
         return permissionService.getPermissions(search, page, size);
     }
 
@@ -43,10 +39,7 @@ public class PermissionController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{permissionId}")
-    public UpdatePermissionNameResponse updateName(
-            @PathVariable Long permissionId,
-            @RequestBody UpdatePermissionNameRequest request
-    ) {
+    public UpdatePermissionNameResponse updateName(@PathVariable Long permissionId, @RequestBody UpdatePermissionNameRequest request) {
         return permissionService.updatePermissionName(permissionId, request);
     }
 

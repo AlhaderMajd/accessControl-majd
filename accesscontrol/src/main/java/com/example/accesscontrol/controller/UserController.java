@@ -42,11 +42,7 @@ public class UserController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping
-    public ResponseEntity<GetUsersResponse> getUsers(
-            @RequestParam(defaultValue = "") String search,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size
-    ) {
+    public ResponseEntity<GetUsersResponse> getUsers(@RequestParam(defaultValue = "") String search, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size) {
         if (page < 0 || size <= 0) return ResponseEntity.badRequest().build();
         return ResponseEntity.ok(userService.getUsers(search, page, size));
     }
@@ -107,8 +103,7 @@ public class UserController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/{userId}/credentials")
-    public ResponseEntity<AdminUpdateCredentialsResponse> updateUserCredentialsByAdmin(
-            @PathVariable Long userId, @RequestBody AdminUpdateCredentialsRequest request) {
+    public ResponseEntity<AdminUpdateCredentialsResponse> updateUserCredentialsByAdmin(@PathVariable Long userId, @RequestBody AdminUpdateCredentialsRequest request) {
         return ResponseEntity.ok(userService.updateCredentialsByAdmin(userId, request));
     }
 }

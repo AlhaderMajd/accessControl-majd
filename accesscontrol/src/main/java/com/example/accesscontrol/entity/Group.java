@@ -13,15 +13,13 @@ import java.util.Set;
         uniqueConstraints = @UniqueConstraint(name = "uk_groups_name", columnNames = "name"),
         indexes = @Index(name = "idx_groups_name", columnList = "name")
 )
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 @ToString(exclude = {"userGroups", "groupRoles"})
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Group {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @EqualsAndHashCode.Include

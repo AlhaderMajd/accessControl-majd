@@ -28,11 +28,7 @@ public class RoleController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping
-    public GetRolesResponse getRoles(
-            @RequestParam(defaultValue = "") String search,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size
-    ) {
+    public GetRolesResponse getRoles(@RequestParam(defaultValue = "") String search, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size) {
         return roleService.getRoles(search, page, size);
     }
 

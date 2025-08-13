@@ -9,7 +9,6 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class UpdateGroupNameRequest {
-
     @NotBlank
     @Size(max = 100)
     private String name;

@@ -16,15 +16,13 @@ import java.util.Set;
                 @Index(name = "idx_users_enabled", columnList = "enabled")
         }
 )
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 @ToString(exclude = {"userRoles", "userGroups"})
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class User {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @EqualsAndHashCode.Include

@@ -28,11 +28,7 @@ public class GroupController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping
-    public ResponseEntity<PageResponse<GroupResponse>> getGroups(
-            @RequestParam(defaultValue = "") String q,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size
-    ) {
+    public ResponseEntity<PageResponse<GroupResponse>> getGroups(@RequestParam(defaultValue = "") String q, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size) {
         var resp = groupService.getGroups(q, page, size);
         return ResponseEntity.ok(resp);
     }
@@ -46,10 +42,7 @@ public class GroupController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{groupId}")
-    public ResponseEntity<UpdateGroupNameResponse> updateGroupName(
-            @PathVariable Long groupId,
-            @RequestBody @Valid UpdateGroupNameRequest body
-    ) {
+    public ResponseEntity<UpdateGroupNameResponse> updateGroupName(@PathVariable Long groupId, @RequestBody @Valid UpdateGroupNameRequest body) {
         var resp = groupService.updateGroupName(groupId, body);
         return ResponseEntity.ok(resp);
     }

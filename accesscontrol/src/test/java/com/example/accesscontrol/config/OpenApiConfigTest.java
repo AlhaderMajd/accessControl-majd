@@ -17,26 +17,22 @@ class OpenApiConfigTest {
 
         assertNotNull(openAPI, "OpenAPI bean should not be null");
 
-        // Validate Info metadata
         Info info = openAPI.getInfo();
         assertNotNull(info, "OpenAPI info should be present");
         assertEquals("Access Control API", info.getTitle());
         assertEquals("RBAC, Users, Roles, Groups, Permissions", info.getDescription());
         assertEquals("v1", info.getVersion());
 
-        // Validate security requirement exists and references bearerAuth
         assertNotNull(openAPI.getSecurity());
         assertTrue(openAPI.getSecurity().stream()
                 .anyMatch(sr -> sr.containsKey("bearerAuth")), "Security requirements should include bearerAuth");
 
-        // Validate components security scheme configuration
         SecurityScheme scheme = openAPI.getComponents().getSecuritySchemes().get("bearerAuth");
         assertNotNull(scheme, "bearerAuth security scheme should be defined");
         assertEquals(SecurityScheme.Type.HTTP, scheme.getType());
         assertEquals("bearer", scheme.getScheme());
         assertEquals("JWT", scheme.getBearerFormat());
 
-        // Extra: Ensure requirement actually refers to the defined scheme
         boolean requirementMatches = openAPI.getSecurity().stream()
                 .map(SecurityRequirement::keySet)
                 .anyMatch(keys -> keys.contains("bearerAuth"));

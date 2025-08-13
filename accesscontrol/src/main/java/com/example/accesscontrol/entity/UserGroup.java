@@ -15,15 +15,13 @@ import lombok.*;
                 @Index(name = "idx_user_groups_group", columnList = "group_id")
         }
 )
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 @ToString(exclude = {"user", "group"})
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class UserGroup {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @EqualsAndHashCode.Include

@@ -48,12 +48,10 @@ class PermissionServiceTest {
 
     @Test
     void createPermissions_empty_throws() {
-        // case 1: empty list
         CreatePermissionsRequest emptyReq = new CreatePermissionsRequest();
         emptyReq.setPermissions(List.of());
         assertThrows(DuplicateResourceException.class, () -> permissionService.createPermissions(emptyReq));
 
-        // case 2: blanks and nulls (Arrays.asList allows nulls; List.of does not)
         CreatePermissionsRequest blankReq = new CreatePermissionsRequest();
         blankReq.setPermissions(Arrays.asList("  ", null));
         assertThrows(DuplicateResourceException.class, () -> permissionService.createPermissions(blankReq));

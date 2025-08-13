@@ -70,7 +70,6 @@ class UserServiceTest {
         SecurityContextHolder.clearContext();
     }
 
-    // ---------------- helpers ----------------
 
     private void mockAuthenticated(String email) {
         SecurityContext sc = mock(SecurityContext.class);
@@ -87,8 +86,6 @@ class UserServiceTest {
         when(sc.getAuthentication()).thenReturn(auth);
         SecurityContextHolder.setContext(sc);
     }
-
-    // ---------------- createUsers ----------------
 
     @Test
     void createUsers_success_assignsMemberRole() {
@@ -161,8 +158,6 @@ class UserServiceTest {
         assertThrows(EmailAlreadyUsedException.class, () -> userService.createUsers(req));
     }
 
-    // ---------------- getUsers ----------------
-
     @Test
     void getUsers_paged_success() {
         when(em.createQuery(anyString(), eq(User.class))).thenReturn(typedQuery);
@@ -205,8 +200,6 @@ class UserServiceTest {
         assertEquals("z@z.com", resp.getUsers().get(0).getEmail());
     }
 
-    // ---------------- getUserDetails ----------------
-
     @Test
     void getUserDetails_invalidId_zero_throws() {
         assertThrows(IllegalArgumentException.class, () -> userService.getUserDetails(0L));
@@ -236,8 +229,6 @@ class UserServiceTest {
         assertEquals(List.of("ADMIN"), resp.getRoles());
         assertEquals(List.of("G1"), resp.getGroups());
     }
-
-    // ---------------- changePassword ----------------
 
     @Test
     void changePassword_success() {
@@ -282,8 +273,6 @@ class UserServiceTest {
                 () -> userService.changePassword(new ChangePasswordRequest("old", "123456")));
     }
 
-    // ---------------- changeEmail ----------------
-
     @Test
     void changeEmail_success() {
         mockAuthenticated("me@x.com");
@@ -311,28 +300,22 @@ class UserServiceTest {
         User me = User.builder().id(1L).email("me@x.com").build();
         when(userRepository.findByEmail("me@x.com")).thenReturn(Optional.of(me));
 
-        // invalid format
         assertThrows(IllegalArgumentException.class,
                 () -> userService.changeEmail(new UpdateEmailRequest("bad")));
 
-        // duplicate (belongs to someone else)
         when(userRepository.findByEmail("dup@x.com"))
                 .thenReturn(Optional.of(User.builder().id(9L).email("dup@x.com").build()));
         assertThrows(EmailAlreadyUsedException.class,
                 () -> userService.changeEmail(new UpdateEmailRequest("dup@x.com")));
 
-        // context null
         SecurityContextHolder.clearContext();
         assertThrows(InvalidCredentialsException.class,
                 () -> userService.changeEmail(new UpdateEmailRequest("ok@x.com")));
 
-        // name null
         mockAuthenticatedNameNull();
         assertThrows(InvalidCredentialsException.class,
                 () -> userService.changeEmail(new UpdateEmailRequest("ok2@x.com")));
     }
-
-    // ---------------- updateUserStatus ----------------
 
     @Test
     void updateUserStatus_success_and_invalid() {
@@ -371,8 +354,6 @@ class UserServiceTest {
         when(userRepository.findAllById(List.of(9L))).thenReturn(List.of());
         assertThrows(ResourceNotFoundException.class, () -> userService.updateUserStatus(noUsers));
     }
-
-    // ---------------- assign/deassign roles & groups ----------------
 
     @Test
     void assignRolesToUsers_success_and_invalid() {
@@ -467,8 +448,6 @@ class UserServiceTest {
         assertEquals(1, resp.getRemovedCount());
     }
 
-    // ---------------- deleteUsers ----------------
-
     @Test
     void deleteUsers_success_and_errors() {
         DeleteUsersRequest req = new DeleteUsersRequest();
@@ -491,8 +470,6 @@ class UserServiceTest {
         when(userRepository.findAllById(List.of(9L))).thenReturn(List.of());
         assertThrows(ResourceNotFoundException.class, () -> userService.deleteUsers(notFound));
     }
-
-    // ---------------- helpers & admin updates ----------------
 
     @Test
     void helpers_getByIdsOrThrow_and_emailExists_and_save_and_getExistingIds_and_getSummaries() {
@@ -545,21 +522,17 @@ class UserServiceTest {
         assertTrue(resp.isEmailUpdated());
         assertTrue(resp.isPasswordUpdated());
 
-        // request == null
         assertThrows(IllegalArgumentException.class, () -> userService.updateCredentialsByAdmin(1L, null));
 
-        // request empty (no email and no password)
         AdminUpdateCredentialsRequest empty = new AdminUpdateCredentialsRequest();
         assertThrows(IllegalArgumentException.class, () -> userService.updateCredentialsByAdmin(1L, empty));
 
-        // invalid email format
         when(userRepository.findById(2L))
                 .thenReturn(Optional.of(User.builder().id(2L).email("a@b.com").build()));
         AdminUpdateCredentialsRequest badEmail = new AdminUpdateCredentialsRequest();
         badEmail.setEmail("bad");
         assertThrows(IllegalArgumentException.class, () -> userService.updateCredentialsByAdmin(2L, badEmail));
 
-        // duplicate email (different user)
         when(userRepository.findById(3L))
                 .thenReturn(Optional.of(User.builder().id(3L).email("self@x.com").build()));
         when(userRepository.findByEmail("dup@x.com"))
@@ -568,21 +541,18 @@ class UserServiceTest {
         dup.setEmail("dup@x.com");
         assertThrows(EmailAlreadyUsedException.class, () -> userService.updateCredentialsByAdmin(3L, dup));
 
-        // invalid password
         when(userRepository.findById(4L))
                 .thenReturn(Optional.of(User.builder().id(4L).email("e@x.com").build()));
         AdminUpdateCredentialsRequest badPwd = new AdminUpdateCredentialsRequest();
         badPwd.setPassword("123");
         assertThrows(IllegalArgumentException.class, () -> userService.updateCredentialsByAdmin(4L, badPwd));
 
-        // Nothing to update (same email ignoring case, no password)
         when(userRepository.findById(5L))
                 .thenReturn(Optional.of(User.builder().id(5L).email("same@x.com").build()));
         AdminUpdateCredentialsRequest sameEmail = new AdminUpdateCredentialsRequest();
         sameEmail.setEmail("SAME@x.com");
         assertThrows(IllegalArgumentException.class, () -> userService.updateCredentialsByAdmin(5L, sameEmail));
 
-        // user not found
         when(userRepository.findById(6L)).thenReturn(Optional.empty());
         assertThrows(ResourceNotFoundException.class, () -> userService.updateCredentialsByAdmin(6L, both));
     }

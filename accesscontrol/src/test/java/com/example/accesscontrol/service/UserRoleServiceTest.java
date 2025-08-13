@@ -26,7 +26,6 @@ class UserRoleServiceTest {
 
     @Test
     void assignRolesToUsers_insertsOnlyMissing() {
-        // Service will call with userIds=[1], roleIds=[10,11]
         when(userRoleRepository.findByUser_IdInAndRole_IdIn(eq(List.of(1L)), eq(List.of(10L, 11L))))
                 .thenReturn(List.of(UserRole.builder()
                         .user(User.builder().id(1L).build())
@@ -40,7 +39,7 @@ class UserRoleServiceTest {
 
         int size = 0;
         for (UserRole ignored : userRoleIterableCaptor.getValue()) size++;
-        assertEquals(1, size); // only (1,11) should be inserted
+        assertEquals(1, size);
     }
 
     @Test

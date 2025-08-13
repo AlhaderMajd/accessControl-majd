@@ -1,7 +1,6 @@
 package com.example.accesscontrol.service;
 
 import com.example.accesscontrol.entity.User;
-import com.example.accesscontrol.exception.UserNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;

@@ -125,7 +125,6 @@ public class RoleService {
             throw new IllegalArgumentException("Requests cannot be empty");
         }
 
-        // Collect unique roleIds and permIds from incoming requests
         List<Long> allRoleIds = requests.stream()
                 .map(AssignPermissionsToRolesRequest::getRoleId)
                 .filter(id -> id != null && id > 0)
@@ -138,18 +137,15 @@ public class RoleService {
                 .distinct()
                 .toList();
 
-        // Resolve existing roles & permissions
         List<Long> existingRoleIds = roleRepository.findAllById(allRoleIds)
                 .stream().map(Role::getId).toList();
 
         List<Long> existingPermissionIds = permissionService.getExistingPermissionIds(allPermissionIds);
 
-        // If either side is empty, SKIP the downstream call
         if (existingRoleIds.isEmpty() || existingPermissionIds.isEmpty()) {
             return "No permissions assigned (0). No valid roles or permissions found.";
         }
 
-        // Delegate once with de-duplicated existing IDs
         int assigned = rolePermissionService.assignPermissionsToRoles(existingRoleIds, existingPermissionIds);
         return "Permissions assigned successfully. Total assignments: " + assigned;
     }

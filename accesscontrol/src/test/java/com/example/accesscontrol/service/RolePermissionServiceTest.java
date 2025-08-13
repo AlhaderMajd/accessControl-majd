@@ -54,7 +54,6 @@ class RolePermissionServiceTest {
         List<Long> roleIds = List.of(1L, 2L);
         List<Long> permissionIds = List.of(10L, 11L);
 
-        // existing: (1,10) only
         RolePermission existing = new RolePermission();
         existing.setRole(Role.builder().id(1L).build());
         existing.setPermission(Permission.builder().id(10L).build());
@@ -62,12 +61,10 @@ class RolePermissionServiceTest {
         when(rolePermissionRepository.findByRole_IdInAndPermission_IdIn(roleIds, permissionIds))
                 .thenReturn(List.of(existing));
 
-        // capture saveAll argument size via Answer
         when(rolePermissionRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
 
         int inserted = rolePermissionService.assignPermissionsToRoles(roleIds, permissionIds);
 
-        // Total combos = 4; 1 exists -> should insert 3
         assertEquals(3, inserted);
         verify(rolePermissionRepository).saveAll(anyList());
     }

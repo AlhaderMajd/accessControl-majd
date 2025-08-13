@@ -10,8 +10,8 @@ public class AdminUpdateCredentialsRequest {
 
     @Email
     @Size(max = 150)
-    private String email;      // optional
+    private String email;
 
     @Size(min = 6, max = 255)
-    private String password;   // optional
+    private String password;
 }

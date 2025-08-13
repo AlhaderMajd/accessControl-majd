@@ -46,8 +46,6 @@ class RoleServiceTest {
         when(permissionService.getExistingPermissionIds(anyList())).thenReturn(List.of());
     }
 
-    // ----------------------- getOrCreateRole -----------------------
-
     @Test
     void getOrCreateRole_createsWhenMissing() {
         when(roleRepository.findByName("MEMBER")).thenReturn(Optional.empty());
@@ -73,7 +71,6 @@ class RoleServiceTest {
         verify(roleRepository, never()).save(any());
     }
 
-    // ----------------------- getByIdsOrThrow / getExistingIds -----------------------
 
     @Test
     void getByIdsOrThrow_success_and_getExistingIds() {
@@ -99,8 +96,6 @@ class RoleServiceTest {
                 .thenReturn(List.of(Role.builder().id(1L).name("A").build()));
         assertThrows(ResourceNotFoundException.class, () -> roleService.getByIdsOrThrow(List.of(1L, 2L)));
     }
-
-    // ----------------------- createRoles (validations, rp building) -----------------------
 
     @Test
     void createRoles_invalid_whenNullOrEmptyRequests_throws() {
@@ -177,8 +172,6 @@ class RoleServiceTest {
         verify(rolePermissionService, never()).saveAll(anyList());
     }
 
-    // ----------------------- getRoles (search == null; empty page) -----------------------
-
     @Test
     void getRoles_nullSearch_usesEmptyString() {
         Page<Role> page = new PageImpl<>(
@@ -208,8 +201,6 @@ class RoleServiceTest {
         assertThrows(IllegalArgumentException.class, () -> roleService.getRoles("q", 0, 0));
     }
 
-    // ----------------------- getRoleWithPermissions (DTO mapping line) -----------------------
-
     @Test
     void getRoleWithPermissions_mapsToPermissionResponseBuilderLine() {
         Role r = Role.builder().id(3L).name("ADMIN").build();
@@ -232,8 +223,6 @@ class RoleServiceTest {
         when(roleRepository.findById(404L)).thenReturn(Optional.empty());
         assertThrows(ResourceNotFoundException.class, () -> roleService.getRoleWithPermissions(404L));
     }
-
-    // ----------------------- updateRoleName (null/blank guard line) -----------------------
 
     @Test
     void updateRoleName_invalid_whenNullOrBlank_throws() {
@@ -264,32 +253,27 @@ class RoleServiceTest {
         assertThrows(ResourceNotFoundException.class, () -> roleService.updateRoleName(77L, req));
     }
 
-    // ----------------------- assignPermissionsToRoles (filters & flatMap) -----------------------
-
     @Test
     void assignPermissionsToRoles_filtersInvalidIds_andSkipsNullPermissionLists() {
-        // Inputs: one valid role + mixed/invalid permission IDs across requests
         AssignPermissionsToRolesRequest valid = new AssignPermissionsToRolesRequest();
         valid.setRoleId(7L);
-        // USE Arrays.asList because it allows null elements
-        valid.setPermissionIds(Arrays.asList(1L, null, 0L, -5L, 2L)); // -> keep 1,2
+        valid.setPermissionIds(Arrays.asList(1L, null, 0L, -5L, 2L));
 
         AssignPermissionsToRolesRequest nullPerms = new AssignPermissionsToRolesRequest();
-        nullPerms.setRoleId(0L);             // filtered out
-        nullPerms.setPermissionIds(null);    // flatMap(null) path
+        nullPerms.setRoleId(0L);
+        nullPerms.setPermissionIds(null);
 
         AssignPermissionsToRolesRequest negRole = new AssignPermissionsToRolesRequest();
-        negRole.setRoleId(-3L);              // filtered out
+        negRole.setRoleId(-3L);
         negRole.setPermissionIds(List.of(99L));
 
         AssignPermissionsToRolesRequest nullRole = new AssignPermissionsToRolesRequest();
-        nullRole.setRoleId(null);            // filtered out
-        nullRole.setPermissionIds(List.of(5L)); // would survive if any role survives
+        nullRole.setRoleId(null);
+        nullRole.setPermissionIds(List.of(5L));
 
-        // Safe stubs
         doReturn(List.of(Role.builder().id(7L).name("R7").build()))
                 .when(roleRepository).findAllById(anyList());
-        doReturn(List.of(1L, 2L, 5L)) // treat only these as existing
+        doReturn(List.of(1L, 2L, 5L))
                 .when(permissionService).getExistingPermissionIds(anyList());
         doReturn(3)
                 .when(rolePermissionService).assignPermissionsToRoles(anyList(), anyList());
@@ -305,14 +289,12 @@ class RoleServiceTest {
     void assignPermissionsToRoles_allFilteredOut_returnsNoAssignmentsMessage() {
         AssignPermissionsToRolesRequest a = new AssignPermissionsToRolesRequest();
         a.setRoleId(0L);
-        // USE Arrays.asList because it allows null elements
         a.setPermissionIds(Arrays.asList(null, 0L, -1L));
 
         AssignPermissionsToRolesRequest b = new AssignPermissionsToRolesRequest();
         b.setRoleId(null);
-        b.setPermissionIds(null); // flatMap(null) path
+        b.setPermissionIds(null);
 
-        // Ensure downstream lookups return nothing (and never null)
         doReturn(List.of()).when(roleRepository).findAllById(anyList());
         doReturn(List.of()).when(permissionService).getExistingPermissionIds(anyList());
 
@@ -345,7 +327,6 @@ class RoleServiceTest {
         assertThrows(IllegalArgumentException.class, () -> roleService.assignPermissionsToRoles(List.of()));
     }
 
-    // ----------------------- deassignPermissionsFromRoles -----------------------
 
     @Test
     void deassignPermissionsFromRoles_removed_gt0() {
@@ -375,7 +356,6 @@ class RoleServiceTest {
         assertThrows(IllegalArgumentException.class, () -> roleService.deassignPermissionsFromRoles(List.of()));
     }
 
-    // ----------------------- assignRolesToGroups / deassignRolesFromGroups -----------------------
 
     @Test
     void assignRolesToGroups_success_insertsCount() {
@@ -434,8 +414,6 @@ class RoleServiceTest {
         assertThrows(IllegalArgumentException.class, () -> roleService.deassignRolesFromGroups(List.of()));
     }
 
-    // ----------------------- deleteRoles -----------------------
-
     @Test
     void deleteRoles_success_cascades_thenDeletes() {
         when(roleRepository.findAllById(List.of(5L)))
@@ -462,8 +440,6 @@ class RoleServiceTest {
         assertThrows(IllegalArgumentException.class, () -> roleService.deleteRoles(null));
         assertThrows(IllegalArgumentException.class, () -> roleService.deleteRoles(List.of()));
     }
-
-    // ----------------------- getRoleSummariesByIds -----------------------
 
     @Test
     void getRoleSummariesByIds_success_andEmpty() {

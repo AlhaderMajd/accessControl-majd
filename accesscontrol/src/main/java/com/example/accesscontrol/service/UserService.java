@@ -153,7 +153,6 @@ public class UserService {
         String newEmail = request.getNewEmail();
         if (!isValidEmail(newEmail)) throw new IllegalArgumentException("Invalid email format");
 
-        // Only treat as taken if it belongs to someone else
         if (!newEmail.equalsIgnoreCase(u.getEmail()) && emailExists(newEmail)) {
             throw new EmailAlreadyUsedException("Email already taken");
         }
@@ -299,11 +298,9 @@ public class UserService {
             if (!isValidEmail(newEmail)) {
                 throw new IllegalArgumentException("Invalid email format");
             }
-            // Block duplicates only when different from current
             if (!newEmail.equalsIgnoreCase(user.getEmail()) && emailExists(newEmail)) {
                 throw new EmailAlreadyUsedException("Email already in use");
             }
-            // Mark updated only if it actually changes (ignore case)
             if (!newEmail.equalsIgnoreCase(user.getEmail())) {
                 user.setEmail(newEmail);
                 emailUpdated = true;

@@ -55,10 +55,8 @@ class JwtAuthenticationFilterTest {
         UserDetails user = new User(email, "{noop}pwd", List.of(new SimpleGrantedAuthority("ROLE_USER")));
         when(userDetailsService.loadUserByUsername(email)).thenReturn(user);
 
-        // Act
         filter.doFilter(request, response, chain);
 
-        // Assert
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         assertNotNull(auth, "Authentication should be set in SecurityContext");
         assertEquals(user, auth.getPrincipal(), "Principal must be the loaded UserDetails");
@@ -72,15 +70,12 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void doFilter_missingToken_doesNotSetAuthenticationButContinues() throws ServletException, IOException {
-        // Arrange
         MockHttpServletRequest request = new MockHttpServletRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
         MockFilterChain chain = new MockFilterChain();
 
-        // Act
         filter.doFilter(request, response, chain);
 
-        // Assert
         assertNull(SecurityContextHolder.getContext().getAuthentication(),
                 "Authentication must remain null when no token provided");
         verifyNoInteractions(jwtTokenProvider, userDetailsService);
@@ -88,7 +83,6 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void doFilter_exceptionDuringProcessing_isCaught_noAuthSet_andContinues() throws ServletException, IOException {
-        // Arrange
         String token = "some.token";
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("Authorization", "Bearer " + token);
@@ -98,10 +92,8 @@ class JwtAuthenticationFilterTest {
         when(jwtTokenProvider.validateToken(token)).thenReturn(true);
         when(jwtTokenProvider.getEmailFromToken(token)).thenThrow(new RuntimeException("bad token"));
 
-        // Act
         filter.doFilter(request, response, chain);
 
-        // Assert
         assertNull(SecurityContextHolder.getContext().getAuthentication(),
                 "Authentication must remain null when exception occurs");
         verify(jwtTokenProvider).validateToken(token);
@@ -111,16 +103,13 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void doFilter_nonBearerAuthorizationHeader_ignored_noValidateCall() throws ServletException, IOException {
-        // Arrange
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("Authorization", "Token abc.def.ghi"); // not starting with "Bearer "
         MockHttpServletResponse response = new MockHttpServletResponse();
         MockFilterChain chain = new MockFilterChain();
 
-        // Act
         filter.doFilter(request, response, chain);
 
-        // Assert
         assertNull(SecurityContextHolder.getContext().getAuthentication(),
                 "Authentication must remain null when header does not start with 'Bearer '");
         verifyNoInteractions(jwtTokenProvider, userDetailsService);
@@ -128,16 +117,13 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void doFilter_blankAuthorizationHeader_ignored_noInteractions() throws ServletException, IOException {
-        // Arrange
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("Authorization", "   "); // blank value
         MockHttpServletResponse response = new MockHttpServletResponse();
         MockFilterChain chain = new MockFilterChain();
 
-        // Act
         filter.doFilter(request, response, chain);
 
-        // Assert
         assertNull(SecurityContextHolder.getContext().getAuthentication(),
                 "Authentication must remain null when header is blank");
         verifyNoInteractions(jwtTokenProvider, userDetailsService);
@@ -145,7 +131,6 @@ class JwtAuthenticationFilterTest {
     
     @Test
     void doFilter_tokenPresent_butValidateFalse_noAuth_noFurtherCalls() throws ServletException, IOException {
-        // Arrange
         String token = "invalid.jwt.token";
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("Authorization", "Bearer " + token);
@@ -154,10 +139,8 @@ class JwtAuthenticationFilterTest {
 
         when(jwtTokenProvider.validateToken(token)).thenReturn(false);
 
-        // Act
         filter.doFilter(request, response, chain);
 
-        // Assert
         assertNull(SecurityContextHolder.getContext().getAuthentication(),
                 "Authentication must remain null when token validation fails");
         verify(jwtTokenProvider).validateToken(token);
@@ -167,7 +150,6 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void doFilter_validateTokenThrows_exceptionCaught_noAuth() throws ServletException, IOException {
-        // Arrange
         String token = "throwing.token";
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("Authorization", "Bearer " + token);
@@ -176,10 +158,8 @@ class JwtAuthenticationFilterTest {
 
         when(jwtTokenProvider.validateToken(token)).thenThrow(new RuntimeException("boom"));
 
-        // Act
         filter.doFilter(request, response, chain);
 
-        // Assert
         assertNull(SecurityContextHolder.getContext().getAuthentication(),
                 "Authentication must remain null when validateToken throws");
         verify(jwtTokenProvider).validateToken(token);
@@ -189,16 +169,13 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void doFilter_bearerPrefixWithoutToken_ignored_noProviderCalls() throws ServletException, IOException {
-        // Arrange
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("Authorization", "Bearer "); // empty token after prefix
         MockHttpServletResponse response = new MockHttpServletResponse();
         MockFilterChain chain = new MockFilterChain();
 
-        // Act
         filter.doFilter(request, response, chain);
 
-        // Assert
         assertNull(SecurityContextHolder.getContext().getAuthentication(),
                 "Authentication must remain null when token is empty after Bearer prefix");
         verifyNoInteractions(jwtTokenProvider, userDetailsService);

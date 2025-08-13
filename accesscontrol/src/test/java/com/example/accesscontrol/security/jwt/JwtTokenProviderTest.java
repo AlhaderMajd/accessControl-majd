@@ -21,7 +21,6 @@ class JwtTokenProviderTest {
     @BeforeEach
     void setUp() throws Exception {
         provider = new JwtTokenProvider();
-        // reflectively set the secret and initialize the key
         Field secretField = JwtTokenProvider.class.getDeclaredField("secret");
         secretField.setAccessible(true);
         secretField.set(provider, SECRET);
@@ -40,7 +39,6 @@ class JwtTokenProviderTest {
 
     @Test
     void validateToken_withInvalidSignature_returnsFalse_and_getEmail_throws() throws Exception {
-        // Generate token with a different secret
         JwtTokenProvider other = new JwtTokenProvider();
         Field secretField = JwtTokenProvider.class.getDeclaredField("secret");
         secretField.setAccessible(true);
@@ -54,7 +52,6 @@ class JwtTokenProviderTest {
 
     @Test
     void validateToken_withExpiredToken_returnsFalse() {
-        // Build an already-expired token using the same secret/key
         SecretKey key = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
         Date now = new Date();
         Date expiredAt = new Date(now.getTime() - 1000L); // 1 second in the past
@@ -66,7 +63,6 @@ class JwtTokenProviderTest {
                 .compact();
 
         assertFalse(provider.validateToken(expiredToken));
-        // parsing should throw due to expiration
         assertThrows(Exception.class, () -> provider.getEmailFromToken(expiredToken));
     }
 

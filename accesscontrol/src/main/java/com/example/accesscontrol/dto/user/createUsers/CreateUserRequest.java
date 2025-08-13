@@ -10,7 +10,6 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class CreateUserRequest {
-
     @Email
     @NotBlank
     @Size(max = 150)

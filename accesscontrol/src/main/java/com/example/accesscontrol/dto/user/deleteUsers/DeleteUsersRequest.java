@@ -8,7 +8,6 @@ import java.util.List;
 
 @Data
 public class DeleteUsersRequest {
-
     @NotEmpty
     private List<@NotNull Long> userIds;
 }
