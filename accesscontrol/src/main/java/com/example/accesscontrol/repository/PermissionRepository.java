@@ -9,9 +9,7 @@ import java.util.Collection;
 import java.util.List;
 
 public interface PermissionRepository extends JpaRepository<Permission, Long> {
-
     List<Permission> findByNameInIgnoreCase(Collection<String> names);
-
     Page<Permission> findByNameContainingIgnoreCase(String name, Pageable pageable);
 
     @Query("""

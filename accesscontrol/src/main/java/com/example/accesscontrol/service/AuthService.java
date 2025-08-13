@@ -29,7 +29,7 @@ public class AuthService {
     public AuthResponse login(AuthRequest request) {
         User user = userService.getByEmailOrThrow(request.getEmail());
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new InvalidCredentialsException();
+            throw new InvalidCredentialsException("Invalid email or password");
         }
         if (!user.isEnabled()) {
             throw new UserDisabledException();

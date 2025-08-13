@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class JwtTokenProviderTest {
 
     private JwtTokenProvider provider;
-    private static final String SECRET = "0123456789abcdef0123456789abcdef"; // 32 bytes
+    private static final String SECRET = "0123456789abcdef0123456789abcdef";
 
     @BeforeEach
     void setUp() throws Exception {
@@ -54,7 +54,7 @@ class JwtTokenProviderTest {
     void validateToken_withExpiredToken_returnsFalse() {
         SecretKey key = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
         Date now = new Date();
-        Date expiredAt = new Date(now.getTime() - 1000L); // 1 second in the past
+        Date expiredAt = new Date(now.getTime() - 1000L);
         String expiredToken = Jwts.builder()
                 .setSubject("user@example.com")
                 .setIssuedAt(new Date(now.getTime() - 2000L))

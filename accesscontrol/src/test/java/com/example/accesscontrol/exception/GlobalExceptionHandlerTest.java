@@ -45,7 +45,7 @@ class GlobalExceptionHandlerTest {
     @Test
     @DisplayName("handleInvalidCredentials returns 401 with message")
     void handleInvalidCredentials() {
-        InvalidCredentialsException ex = new InvalidCredentialsException();
+        InvalidCredentialsException ex = new InvalidCredentialsException("Invalid email or password");
         ResponseEntity<Map<String, Object>> response = handler.handleInvalidCredentials(ex);
 
         assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());

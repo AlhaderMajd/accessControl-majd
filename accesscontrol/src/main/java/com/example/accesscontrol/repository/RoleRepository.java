@@ -9,7 +9,6 @@ import java.util.List;
 import java.util.Optional;
 
 public interface RoleRepository extends JpaRepository<Role, Long> {
-
     Optional<Role> findByName(String name);
 
     @Query("SELECT r.name FROM Role r WHERE r.name IN :names")

@@ -8,15 +8,10 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 
 public interface UserRoleRepository extends JpaRepository<UserRole, Long> {
-
     boolean existsByUser_IdAndRole_Id(Long userId, Long roleId);
-
     List<UserRole> findByUser_IdInAndRole_IdIn(List<Long> userIds, List<Long> roleIds);
-
     int deleteByUser_IdInAndRole_IdIn(List<Long> userIds, List<Long> roleIds);
-
     void deleteByUser_IdIn(List<Long> userIds);
-
     void deleteAllByRole_IdIn(List<Long> roleIds);
 
     @Query("""

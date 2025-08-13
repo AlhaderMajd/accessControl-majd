@@ -37,7 +37,6 @@ class CustomUserDetailsServiceTest {
         assertTrue(details.isAccountNonLocked());
         assertTrue(details.isCredentialsNonExpired());
         assertTrue(details.isEnabled());
-        // authorities should contain ROLE_ prefix
         List<String> auths = details.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList();
         assertTrue(auths.contains("ROLE_ADMIN"));
         assertTrue(auths.contains("ROLE_USER"));

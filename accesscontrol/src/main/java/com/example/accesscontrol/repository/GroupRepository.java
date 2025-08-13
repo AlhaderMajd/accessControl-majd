@@ -8,8 +8,6 @@ import java.util.Collection;
 import java.util.List;
 
 public interface GroupRepository extends JpaRepository<Group, Long> {
-
     List<Group> findByNameInIgnoreCase(Collection<String> names);
-
     Page<Group> findByNameContainingIgnoreCase(String search, Pageable pageable);
 }

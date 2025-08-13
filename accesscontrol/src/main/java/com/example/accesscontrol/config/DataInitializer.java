@@ -43,7 +43,7 @@ public class DataInitializer implements CommandLineRunner {
         ensureMinGroupRoles(groups, roles, MIN_COUNT);
         ensureMinRolePermissions(roles, permissions, MIN_COUNT);
 
-        System.out.println("✅ DataInitializer completed.");
+        System.out.println("DataInitializer completed.");
     }
 
     private List<Role> ensureFixedRoles() {

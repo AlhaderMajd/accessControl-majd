@@ -118,7 +118,7 @@ class JwtAuthenticationFilterTest {
     @Test
     void doFilter_blankAuthorizationHeader_ignored_noInteractions() throws ServletException, IOException {
         MockHttpServletRequest request = new MockHttpServletRequest();
-        request.addHeader("Authorization", "   "); // blank value
+        request.addHeader("Authorization", "   ");
         MockHttpServletResponse response = new MockHttpServletResponse();
         MockFilterChain chain = new MockFilterChain();
 
@@ -170,7 +170,7 @@ class JwtAuthenticationFilterTest {
     @Test
     void doFilter_bearerPrefixWithoutToken_ignored_noProviderCalls() throws ServletException, IOException {
         MockHttpServletRequest request = new MockHttpServletRequest();
-        request.addHeader("Authorization", "Bearer "); // empty token after prefix
+        request.addHeader("Authorization", "Bearer ");
         MockHttpServletResponse response = new MockHttpServletResponse();
         MockFilterChain chain = new MockFilterChain();
 
