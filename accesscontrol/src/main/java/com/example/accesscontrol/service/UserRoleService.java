@@ -7,11 +7,13 @@ import com.example.accesscontrol.entity.UserRole;
 import com.example.accesscontrol.repository.UserRoleRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserRoleService {
@@ -26,12 +28,12 @@ public class UserRoleService {
     public int assignRolesToUsers(List<Long> userIds, List<Long> roleIds) {
         if (userIds == null || userIds.isEmpty() || roleIds == null || roleIds.isEmpty()) return 0;
 
-        var existingPairs = userRoleRepository.findByUser_IdInAndRole_IdIn(userIds, roleIds);
-        Set<String> existingKeys = existingPairs.stream()
+        var existingBefore = userRoleRepository.findByUser_IdInAndRole_IdIn(userIds, roleIds);
+        var existingKeys = existingBefore.stream()
                 .map(ur -> ur.getUser().getId() + "_" + ur.getRole().getId())
-                .collect(Collectors.toSet());
+                .collect(java.util.stream.Collectors.toSet());
 
-        List<UserRole> toInsert = new ArrayList<>();
+        List<UserRole> toInsert = new java.util.ArrayList<>();
         for (Long uId : userIds) {
             for (Long rId : roleIds) {
                 String key = uId + "_" + rId;
@@ -44,8 +46,17 @@ public class UserRoleService {
             }
         }
 
-        if (!toInsert.isEmpty()) userRoleRepository.saveAll(toInsert);
-        return toInsert.size();
+        if (toInsert.isEmpty()) return 0;
+
+        try {
+            userRoleRepository.saveAll(toInsert);
+            return toInsert.size();
+        } catch (DataIntegrityViolationException ex) {
+            log.info("users.roles.assign race_detected: unique_violation during saveAll, recomputing delta");
+            var existingAfter = userRoleRepository.findByUser_IdInAndRole_IdIn(userIds, roleIds);
+            int delta = Math.max(0, existingAfter.size() - existingBefore.size());
+            return delta;
+        }
     }
 
     @Transactional
@@ -53,7 +64,13 @@ public class UserRoleService {
         List<Long> userIds = users.stream().map(User::getId).toList();
         List<Long> roleIds = roles.stream().map(Role::getId).toList();
         int removed = userRoleRepository.deleteByUser_IdInAndRole_IdIn(userIds, roleIds);
-        return DeassignRolesResponse.builder().message("Roles deassigned successfully").removedCount(removed).build();
+
+        log.info("users.roles.deassign repo removed={}", removed);
+
+        return DeassignRolesResponse.builder()
+                .message(removed > 0 ? "Roles deassigned successfully" : "No roles were deassigned")
+                .removedCount(removed)
+                .build();
     }
 
     @Transactional

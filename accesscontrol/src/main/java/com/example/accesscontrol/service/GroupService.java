@@ -26,6 +26,14 @@ public class GroupService {
     private final RoleService roleService;
 
     @Transactional(readOnly = true)
+    public List<Long> getExistingIds(List<Long> groupIds) {
+        if (groupIds == null || groupIds.isEmpty()) return java.util.List.of();
+        return groupRepository.findAllById(groupIds).stream()
+                .map(com.example.accesscontrol.entity.Group::getId)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public Group getByIdOrThrow(Long id) {
         return groupRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Group not found"));
     }

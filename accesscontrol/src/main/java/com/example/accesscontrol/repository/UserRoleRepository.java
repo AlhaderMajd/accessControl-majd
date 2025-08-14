@@ -14,6 +14,7 @@ public interface UserRoleRepository extends JpaRepository<UserRole, Long> {
     void deleteByUser_IdIn(List<Long> userIds);
     void deleteAllByRole_IdIn(List<Long> roleIds);
 
+    //n+1
     @Query("""
             SELECT r.name
             FROM UserRole ur

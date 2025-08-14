@@ -1,5 +1,6 @@
 package com.example.accesscontrol.exception;
 
+import jakarta.persistence.OptimisticLockException;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +13,10 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(OptimisticLockException.class)
+    public ResponseEntity<Map<String, Object>> handleOptimisticLock(OptimisticLockException ex) {
+        return buildResponse(HttpStatus.CONFLICT, "Update conflict. Please retry.");
+    }
     @ExceptionHandler(UserNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleUserNotFound(UserNotFoundException ex) {
         return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage());

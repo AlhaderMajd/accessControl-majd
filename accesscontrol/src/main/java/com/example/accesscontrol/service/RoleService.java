@@ -4,9 +4,10 @@ import com.example.accesscontrol.dto.group.AssignRolesToGroupsRequest;
 import com.example.accesscontrol.dto.permission.PermissionResponse;
 import com.example.accesscontrol.dto.role.*;
 import com.example.accesscontrol.entity.*;
-import com.example.accesscontrol.exception.DuplicateResourceException;
 import com.example.accesscontrol.exception.ResourceNotFoundException;
 import com.example.accesscontrol.repository.RoleRepository;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class RoleService {
@@ -28,7 +30,13 @@ public class RoleService {
     @Transactional
     public Role getOrCreateRole(String roleName) {
         return roleRepository.findByName(roleName)
-                .orElseGet(() -> roleRepository.save(Role.builder().name(roleName).build()));
+                .orElseGet(() -> {
+                    try {
+                        return roleRepository.save(Role.builder().name(roleName).build());
+                    } catch (DataIntegrityViolationException e) {
+                        return roleRepository.findByName(roleName).orElseThrow(() -> e);
+                    }
+                });
     }
 
     @Transactional(readOnly = true)
@@ -46,23 +54,64 @@ public class RoleService {
     @Transactional
     public CreateRoleResponse createRoles(List<CreateRoleRequest> requests) {
         if (requests == null || requests.isEmpty()
-                || requests.stream().anyMatch(r -> r.getName() == null || r.getName().isBlank()))
+                || requests.stream().anyMatch(r -> r.getName() == null || r.getName().isBlank())) {
             throw new IllegalArgumentException("Invalid role data");
+        }
 
-        List<String> names = requests.stream().map(CreateRoleRequest::getName).toList();
-        List<String> existingNames = roleRepository.findExistingNames(names);
-        if (!existingNames.isEmpty())
-            throw new DuplicateResourceException("Some role names already exist: " + existingNames);
+        var normalized = requests.stream().map(r -> {
+            var name = r.getName().trim();
+            var pids = (r.getPermissionIds() == null) ? List.<Long>of()
+                    : r.getPermissionIds().stream()
+                    .filter(Objects::nonNull).filter(id -> id > 0).distinct().toList();
+            var nr = new CreateRoleRequest();
+            nr.setName(name);
+            nr.setPermissionIds(pids);
+            return nr;
+        }).toList();
 
-        var roles = requests.stream()
-                .map(req -> Role.builder().name(req.getName()).build())
+        var dupNames = normalized.stream()
+                .collect(java.util.stream.Collectors.groupingBy(CreateRoleRequest::getName, java.util.stream.Collectors.counting()))
+                .entrySet().stream().filter(e -> e.getValue() > 1).map(Map.Entry::getKey).toList();
+        if (!dupNames.isEmpty()) {
+            throw new com.example.accesscontrol.exception.DuplicateResourceException("Duplicate role names in request: " + dupNames);
+        }
+
+        var names = normalized.stream().map(CreateRoleRequest::getName).toList();
+        var existingNames = roleRepository.findExistingNames(names);
+        if (!existingNames.isEmpty()) {
+            throw new com.example.accesscontrol.exception.DuplicateResourceException("Some role names already exist: " + existingNames);
+        }
+
+        var allPermissionIds = normalized.stream()
+                .flatMap(r -> r.getPermissionIds().stream())
+                .distinct().toList();
+        if (!allPermissionIds.isEmpty()) {
+            var existingPermIds = permissionService.getExistingPermissionIds(allPermissionIds);
+            if (existingPermIds.size() != allPermissionIds.size()) {
+                var missing = new java.util.HashSet<>(allPermissionIds);
+                missing.removeAll(existingPermIds);
+                throw new com.example.accesscontrol.exception.ResourceNotFoundException("Some permissions not found: " + missing);
+            }
+        }
+
+        var toPersist = normalized.stream()
+                .map(r -> Role.builder().name(r.getName()).build())
                 .toList();
-        roleRepository.saveAll(roles);
 
-        Map<String, Long> nameToId = roles.stream().collect(Collectors.toMap(Role::getName, Role::getId));
-        List<RolePermission> rp = new ArrayList<>();
-        for (CreateRoleRequest req : requests) {
-            if (req.getPermissionIds() != null && !req.getPermissionIds().isEmpty()) {
+        List<Role> savedRoles;
+        try {
+            savedRoles = roleRepository.saveAll(toPersist);
+        } catch (DataIntegrityViolationException e) {
+            var nowExisting = roleRepository.findExistingNames(names);
+            throw new com.example.accesscontrol.exception.DuplicateResourceException("Some role names already exist: " + nowExisting);
+        }
+
+        var nameToId = savedRoles.stream()
+                .collect(java.util.stream.Collectors.toMap(Role::getName, Role::getId));
+
+        List<RolePermission> rp = new java.util.ArrayList<>();
+        for (var req : normalized) {
+            if (!req.getPermissionIds().isEmpty()) {
                 Long roleId = nameToId.get(req.getName());
                 for (Long pid : req.getPermissionIds()) {
                     RolePermission link = new RolePermission();
@@ -72,25 +121,37 @@ public class RoleService {
                 }
             }
         }
-        if (!rp.isEmpty()) rolePermissionService.saveAll(rp);
+        if (!rp.isEmpty()) {
+            rolePermissionService.saveAll(rp);
+        }
+
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        String actor = (auth == null) ? "unknown" : auth.getName();
+        log.info("roles.create success actor={} created={} with_permissions={}",
+                mask(actor), savedRoles.size(), !rp.isEmpty());
 
         return CreateRoleResponse.builder()
                 .message("Roles created successfully")
-                .created(names)
+                .created(savedRoles.stream().map(Role::getName).toList())
                 .build();
     }
 
     @Transactional(readOnly = true)
     public GetRolesResponse getRoles(String search, int page, int size) {
-        if (page < 0 || size <= 0) throw new IllegalArgumentException("Invalid pagination or search parameters");
-        Pageable pageable = PageRequest.of(page, size);
-        Page<Role> rolePage = roleRepository.findByNameContainingIgnoreCase(search == null ? "" : search, pageable);
+        final String q = (search == null ? "" : search.trim());
+        final int pageSafe = Math.max(0, page);
+        final int sizeSafe = Math.min(Math.max(1, size), 100);
+        final Pageable pageable = PageRequest.of(pageSafe, sizeSafe, Sort.by(Sort.Direction.DESC, "id"));
+
+        Page<Role> rolePage = roleRepository.findByNameContainingIgnoreCase(q, pageable);
+
         var roles = rolePage.getContent().stream()
                 .map(r -> RoleResponse.builder().id(r.getId()).name(r.getName()).build())
                 .toList();
+
         return GetRolesResponse.builder()
                 .roles(roles)
-                .page(page)
+                .page(pageSafe)
                 .total(rolePage.getTotalElements())
                 .build();
     }
@@ -197,5 +258,11 @@ public class RoleService {
         return roleRepository.findAllById(roleIds).stream()
                 .map(r -> RoleResponse.builder().id(r.getId()).name(r.getName()).build())
                 .toList();
+    }
+
+    private String mask(String email) {
+        if (email == null || !email.contains("@")) return "unknown";
+        String[] p = email.split("@", 2);
+        return (p[0].isEmpty() ? "*" : p[0].substring(0,1)) + "***@" + p[1];
     }
 }

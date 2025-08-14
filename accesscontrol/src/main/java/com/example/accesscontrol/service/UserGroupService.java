@@ -5,10 +5,13 @@ import com.example.accesscontrol.dto.user.assignUsersToGroup.AssignUsersToGroups
 import com.example.accesscontrol.dto.user.deassignUsersFromGroups.DeassignUsersFromGroupsRequest;
 import com.example.accesscontrol.dto.user.deassignUsersFromGroups.DeassignUsersFromGroupsResponse;
 import com.example.accesscontrol.entity.Group;
+import com.example.accesscontrol.entity.User;
 import com.example.accesscontrol.entity.UserGroup;
 import com.example.accesscontrol.repository.GroupRepository;
 import com.example.accesscontrol.repository.UserGroupRepository;
 import com.example.accesscontrol.repository.UserRepository;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -16,6 +19,7 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserGroupService {
@@ -24,47 +28,100 @@ public class UserGroupService {
     private final UserRepository userRepository;
     private final GroupRepository groupRepository;
 
+    @Transactional(readOnly = true)
+    public List<String> getGroupNamesByUserId(Long userId) {
+        return userGroupRepository.findGroupNamesByUserId(userId);
+    }
+
     @Transactional
     public AssignUsersToGroupsResponse assignUsersToGroups(AssignUsersToGroupsRequest request) {
-        if (request.getUserIds() == null || request.getUserIds().isEmpty()
-                || request.getGroupIds() == null || request.getGroupIds().isEmpty()) {
+        if (request.getUserIds() == null || request.getGroupIds() == null) {
             return AssignUsersToGroupsResponse.builder().message("Nothing to assign").assignedCount(0).build();
         }
 
-        var existing = userGroupRepository.findByUser_IdInAndGroup_IdIn(request.getUserIds(), request.getGroupIds());
-        Set<String> existingKeys = existing.stream()
-                .map(ug -> ug.getUser().getId() + "_" + ug.getGroup().getId())
-                .collect(Collectors.toSet());
+        var userIds = request.getUserIds().stream()
+                .filter(Objects::nonNull).filter(id -> id > 0).distinct().toList();
+        var groupIds = request.getGroupIds().stream()
+                .filter(Objects::nonNull).filter(id -> id > 0).distinct().toList();
 
-        List<UserGroup> toInsert = new ArrayList<>();
-        for (Long uId : request.getUserIds()) {
-            if (!userRepository.existsById(uId)) continue;
-            for (Long gId : request.getGroupIds()) {
-                if (!groupRepository.existsById(gId)) continue;
+        if (userIds.isEmpty() || groupIds.isEmpty()) {
+            return AssignUsersToGroupsResponse.builder().message("Nothing to assign").assignedCount(0).build();
+        }
+
+        var existingUsers = userRepository.findAllById(userIds);
+        var existingGroups = groupRepository.findAllById(groupIds);
+        if (existingUsers.size() != userIds.size() || existingGroups.size() != groupIds.size()) {
+            var userFound = existingUsers.stream().map(User::getId).collect(java.util.stream.Collectors.toSet());
+            var groupFound = existingGroups.stream().map(Group::getId).collect(java.util.stream.Collectors.toSet());
+            var missingUsers = userIds.stream().filter(id -> !userFound.contains(id)).toList();
+            var missingGroups = groupIds.stream().filter(id -> !groupFound.contains(id)).toList();
+            String msg = "Some IDs not found";
+            if (!missingUsers.isEmpty()) msg += " (users: " + missingUsers + ")";
+            if (!missingGroups.isEmpty()) msg += " (groups: " + missingGroups + ")";
+            throw new com.example.accesscontrol.exception.ResourceNotFoundException(msg);
+        }
+
+        var existingPairs = userGroupRepository.findByUser_IdInAndGroup_IdIn(userIds, groupIds);
+        var existingKeys = existingPairs.stream()
+                .map(ug -> ug.getUser().getId() + "_" + ug.getGroup().getId())
+                .collect(java.util.stream.Collectors.toSet());
+
+        List<UserGroup> toInsert = new java.util.ArrayList<>();
+        for (Long uId : userIds) {
+            for (Long gId : groupIds) {
                 String key = uId + "_" + gId;
                 if (!existingKeys.contains(key)) {
                     UserGroup ug = new UserGroup();
-                    ug.setUser(com.example.accesscontrol.entity.User.builder().id(uId).build());
-                    ug.setGroup(com.example.accesscontrol.entity.Group.builder().id(gId).build());
+                    ug.setUser(User.builder().id(uId).build());
+                    ug.setGroup(Group.builder().id(gId).build());
                     toInsert.add(ug);
                 }
             }
         }
 
-        if (!toInsert.isEmpty()) userGroupRepository.saveAll(toInsert);
+        int assigned = 0;
+        if (!toInsert.isEmpty()) {
+            try {
+                userGroupRepository.saveAll(toInsert);
+                assigned = toInsert.size();
+            } catch (DataIntegrityViolationException ex) {
+                var after = userGroupRepository.findByUser_IdInAndGroup_IdIn(userIds, groupIds);
+                assigned = Math.max(0, after.size() - existingPairs.size());
+            }
+        }
+
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        String actor = (auth == null) ? "unknown" : auth.getName();
+        log.info("users.groups.assign success actor={} users={} groups={} assigned={}",
+                mask(actor), userIds.size(), groupIds.size(), assigned);
 
         return AssignUsersToGroupsResponse.builder()
-                .message("Users assigned to groups successfully")
-                .assignedCount(toInsert.size())
+                .message(assigned > 0 ? "Users assigned to groups successfully" : "Nothing new to assign")
+                .assignedCount(assigned)
                 .build();
     }
 
     @Transactional
     public DeassignUsersFromGroupsResponse deassignUsersFromGroups(DeassignUsersFromGroupsRequest request) {
-        int deletedCount = userGroupRepository.deleteByUser_IdInAndGroup_IdIn(
-                request.getUserIds(), request.getGroupIds());
+        var userIds = request.getUserIds();
+        var groupIds = request.getGroupIds();
+
+        if (userIds == null || userIds.isEmpty() || groupIds == null || groupIds.isEmpty())
+            throw new IllegalArgumentException("User or group list is invalid");
+
+        var groups = groupRepository.findAllById(groupIds);
+        if (groups.size() != groupIds.size()) {
+            var found = groups.stream().map(Group::getId).collect(java.util.stream.Collectors.toSet());
+            var missingGroups = groupIds.stream().filter(id -> !found.contains(id)).toList();
+            throw new com.example.accesscontrol.exception.ResourceNotFoundException(
+                    "Some groups not found: " + missingGroups);
+        }
+
+        int deletedCount = userGroupRepository.deleteByUser_IdInAndGroup_IdIn(userIds, groupIds);
+
         return DeassignUsersFromGroupsResponse.builder()
-                .message("Users deassigned from groups successfully")
+                .message(deletedCount > 0 ? "Users deassigned from groups successfully"
+                        : "No memberships were removed")
                 .removedCount(deletedCount)
                 .build();
     }
@@ -95,11 +152,9 @@ public class UserGroupService {
         userGroupRepository.deleteByGroup_IdIn(groupIds);
     }
 
-    @Transactional(readOnly = true)
-    public List<String> getGroupNamesByUserId(Long userId) {
-        var ids = getGroupIdsByUserId(userId);
-        return groupRepository.findAllById(ids).stream()
-                .map(Group::getName)
-                .collect(Collectors.toList());
+    private String mask(String email) {
+        if (email == null || !email.contains("@")) return "unknown";
+        String[] p = email.split("@", 2);
+        return (p[0].isEmpty() ? "*" : p[0].substring(0,1)) + "***@" + p[1];
     }
 }
