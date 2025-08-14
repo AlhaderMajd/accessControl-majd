@@ -74,14 +74,6 @@ public class AuthService {
                 .build();
     }
 
-    private void auditLoginFailure(String email, String reason) {
-        log.info("auth.login.failed email={} reason={}", mask(email), reason);
-    }
-
-    private void auditLoginSuccess(Long userId, String email) {
-        log.info("auth.login.success userId={} email={}", userId, mask(email));
-    }
-
     @Transactional
     public AuthResponse register(AuthRequest request) {
         final String email = request.getEmail() == null ? null : request.getEmail().trim();
@@ -123,12 +115,28 @@ public class AuthService {
         }
     }
 
+    private void auditLoginFailure(String email, String reason) {
+        log.info("auth.login.failed email={} reason={}", mask(email), reason);
+    }
+
+    private void auditLoginSuccess(Long userId, String email) {
+        log.info("auth.login.success userId={} email={}", userId, mask(email));
+    }
+
     private void auditRegisterSuccess(Long userId, String email) {
         log.info("auth.register.success userId={} email={}", userId, mask(email));
     }
 
     private void auditRegisterFailure(String email, String reason) {
         log.info("auth.register.failed email={} reason={}", mask(email), reason);
+    }
+
+    private boolean isValidEmail(String email) {
+        return email != null && email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$");
+    }
+
+    private boolean isValidPassword(String password) {
+        return password != null && password.length() >= 6;
     }
 
     private String mask(String email) {
@@ -138,13 +146,5 @@ public class AuthService {
         String domain = parts[1];
         String head = local.isEmpty() ? "*" : local.substring(0, 1);
         return head + "***@" + domain;
-    }
-
-    private boolean isValidEmail(String email) {
-        return email != null && email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$");
-    }
-
-    private boolean isValidPassword(String password) {
-        return password != null && password.length() >= 6;
     }
 }

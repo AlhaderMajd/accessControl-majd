@@ -28,19 +28,6 @@ public class GroupService {
     private final UserService userService;
     private final RoleService roleService;
 
-    @Transactional(readOnly = true)
-    public List<Long> getExistingIds(List<Long> groupIds) {
-        if (groupIds == null || groupIds.isEmpty()) return java.util.List.of();
-        return groupRepository.findAllById(groupIds).stream()
-                .map(com.example.accesscontrol.entity.Group::getId)
-                .toList();
-    }
-
-    @Transactional(readOnly = true)
-    public Group getByIdOrThrow(Long id) {
-        return groupRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Group not found"));
-    }
-
     @Transactional
     public CreateGroupsResponse createGroups(List<CreateGroupRequest> items) {
         if (items == null || items.isEmpty())
@@ -238,6 +225,11 @@ public class GroupService {
         return MessageResponse.builder()
                 .message("Group(s) deleted successfully")
                 .build();
+    }
+
+    @Transactional(readOnly = true)
+    public Group getByIdOrThrow(Long id) {
+        return groupRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Group not found"));
     }
 
     private String mask(String email) {

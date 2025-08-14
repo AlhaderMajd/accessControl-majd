@@ -34,40 +34,52 @@ public class UserGroupService {
 
     @Transactional
     public AssignUsersToGroupsResponse assignUsersToGroups(AssignUsersToGroupsRequest request) {
-        if (request.getUserIds() == null || request.getGroupIds() == null) {
-            return AssignUsersToGroupsResponse.builder().message("Nothing to assign").assignedCount(0).build();
+        if (request == null
+                || request.getUserIds() == null || request.getUserIds().isEmpty()
+                || request.getGroupIds() == null || request.getGroupIds().isEmpty()) {
+            return AssignUsersToGroupsResponse.builder()
+                    .message("Nothing to assign")
+                    .assignedCount(0)
+                    .build();
         }
 
         var userIds = request.getUserIds().stream()
-                .filter(Objects::nonNull).filter(id -> id > 0).distinct().toList();
+                .filter(Objects::nonNull).filter(id -> id > 0)
+                .distinct().toList();
         var groupIds = request.getGroupIds().stream()
-                .filter(Objects::nonNull).filter(id -> id > 0).distinct().toList();
+                .filter(Objects::nonNull).filter(id -> id > 0)
+                .distinct().toList();
 
         if (userIds.isEmpty() || groupIds.isEmpty()) {
-            return AssignUsersToGroupsResponse.builder().message("Nothing to assign").assignedCount(0).build();
+            return AssignUsersToGroupsResponse.builder()
+                    .message("Nothing to assign")
+                    .assignedCount(0)
+                    .build();
         }
 
-        var existingUsers = userRepository.findAllById(userIds);
-        var existingGroups = groupRepository.findAllById(groupIds);
-        if (existingUsers.size() != userIds.size() || existingGroups.size() != groupIds.size()) {
-            var userFound = existingUsers.stream().map(User::getId).collect(java.util.stream.Collectors.toSet());
-            var groupFound = existingGroups.stream().map(Group::getId).collect(java.util.stream.Collectors.toSet());
-            var missingUsers = userIds.stream().filter(id -> !userFound.contains(id)).toList();
-            var missingGroups = groupIds.stream().filter(id -> !groupFound.contains(id)).toList();
-            String msg = "Some IDs not found";
-            if (!missingUsers.isEmpty()) msg += " (users: " + missingUsers + ")";
-            if (!missingGroups.isEmpty()) msg += " (groups: " + missingGroups + ")";
-            throw new com.example.accesscontrol.exception.ResourceNotFoundException(msg);
+        var existingUserIds = userRepository.findAllById(userIds).stream()
+                .map(User::getId).collect(java.util.stream.Collectors.toSet());
+        var existingGroupIds = groupRepository.findAllById(groupIds).stream()
+                .map(Group::getId).collect(java.util.stream.Collectors.toSet());
+
+        if (existingUserIds.isEmpty() || existingGroupIds.isEmpty()) {
+            return AssignUsersToGroupsResponse.builder()
+                    .message("Nothing to assign")
+                    .assignedCount(0)
+                    .build();
         }
 
-        var existingPairs = userGroupRepository.findByUser_IdInAndGroup_IdIn(userIds, groupIds);
-        var existingKeys = existingPairs.stream()
+        var existingLinks = userGroupRepository.findByUser_IdInAndGroup_IdIn(
+                new java.util.ArrayList<>(existingUserIds),
+                new java.util.ArrayList<>(existingGroupIds));
+
+        var existingKeys = existingLinks.stream()
                 .map(ug -> ug.getUser().getId() + "_" + ug.getGroup().getId())
                 .collect(java.util.stream.Collectors.toSet());
 
         List<UserGroup> toInsert = new java.util.ArrayList<>();
-        for (Long uId : userIds) {
-            for (Long gId : groupIds) {
+        for (Long uId : existingUserIds) {
+            for (Long gId : existingGroupIds) {
                 String key = uId + "_" + gId;
                 if (!existingKeys.contains(key)) {
                     UserGroup ug = new UserGroup();
@@ -78,25 +90,32 @@ public class UserGroupService {
             }
         }
 
-        int assigned = 0;
-        if (!toInsert.isEmpty()) {
-            try {
-                userGroupRepository.saveAll(toInsert);
-                assigned = toInsert.size();
-            } catch (DataIntegrityViolationException ex) {
-                var after = userGroupRepository.findByUser_IdInAndGroup_IdIn(userIds, groupIds);
-                assigned = Math.max(0, after.size() - existingPairs.size());
-            }
+        if (toInsert.isEmpty()) {
+            log.info("users.groups.assign no_new_pairs users={} groups={} inserted=0",
+                    existingUserIds.size(), existingGroupIds.size());
+            return AssignUsersToGroupsResponse.builder()
+                    .message("Users assigned to groups successfully")
+                    .assignedCount(0)
+                    .build();
         }
 
-        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        String actor = (auth == null) ? "unknown" : auth.getName();
-        log.info("users.groups.assign success actor={} users={} groups={} assigned={}",
-                mask(actor), userIds.size(), groupIds.size(), assigned);
+        int inserted;
+        try {
+            userGroupRepository.saveAll(toInsert);
+            inserted = toInsert.size();
+        } catch (DataIntegrityViolationException ex) {
+            var after = userGroupRepository.findByUser_IdInAndGroup_IdIn(
+                    new java.util.ArrayList<>(existingUserIds),
+                    new java.util.ArrayList<>(existingGroupIds));
+            inserted = Math.max(0, after.size() - existingLinks.size());
+        }
+
+        log.info("users.groups.assign success users={} groups={} inserted={}",
+                existingUserIds.size(), existingGroupIds.size(), inserted);
 
         return AssignUsersToGroupsResponse.builder()
-                .message(assigned > 0 ? "Users assigned to groups successfully" : "Nothing new to assign")
-                .assignedCount(assigned)
+                .message("Users assigned to groups successfully")
+                .assignedCount(inserted)
                 .build();
     }
 

@@ -180,6 +180,65 @@ public class UserService {
     }
 
     @Transactional
+    public AdminUpdateCredentialsResponse updateCredentialsByAdmin(Long userId, AdminUpdateCredentialsRequest request) {
+        if (request == null ||
+                (!StringUtils.hasText(request.getEmail()) && !StringUtils.hasText(request.getPassword()))) {
+            throw new IllegalArgumentException("At least one of email or password must be provided");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        boolean emailUpdated = false;
+        boolean passwordUpdated = false;
+
+        if (StringUtils.hasText(request.getEmail())) {
+            String newEmail = request.getEmail().trim();
+            if (!isValidEmail(newEmail)) {
+                throw new IllegalArgumentException("Invalid email format");
+            }
+            if (!newEmail.equalsIgnoreCase(user.getEmail())) {
+                if (emailExists(newEmail)) {
+                    throw new EmailAlreadyUsedException("Email already in use");
+                }
+                user.setEmail(newEmail);
+                emailUpdated = true;
+            }
+        }
+
+        if (StringUtils.hasText(request.getPassword())) {
+            String newPwd = request.getPassword();
+            if (!isValidPassword(newPwd)) {
+                throw new IllegalArgumentException("Password must meet security requirements");
+            }
+            user.setPassword(passwordEncoder.encode(newPwd));
+            passwordUpdated = true;
+        }
+
+        if (!emailUpdated && !passwordUpdated) {
+            throw new IllegalArgumentException("Nothing to update");
+        }
+
+        try {
+            userRepository.save(user);
+        } catch (DataIntegrityViolationException ex) {
+            throw new EmailAlreadyUsedException("Email already in use");
+        }
+
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        String actor = (auth == null) ? "unknown" : auth.getName();
+        log.info("users.admin.update_credentials success actor={} userId={} emailUpdated={} passwordUpdated={}",
+                mask(actor), user.getId(), emailUpdated, passwordUpdated);
+
+        return AdminUpdateCredentialsResponse.builder()
+                .message("Credentials updated successfully")
+                .id(user.getId())
+                .emailUpdated(emailUpdated)
+                .passwordUpdated(passwordUpdated)
+                .build();
+    }
+
+    @Transactional
     public void changePassword(ChangePasswordRequest request) {
         if (!isValidPassword(request.getNewPassword()))
             throw new IllegalArgumentException("Password must meet security requirements");
@@ -467,65 +526,6 @@ public class UserService {
                         .enabled(u.isEnabled())
                         .build())
                 .toList();
-    }
-
-    @Transactional
-    public AdminUpdateCredentialsResponse updateCredentialsByAdmin(Long userId, AdminUpdateCredentialsRequest request) {
-        if (request == null ||
-                (!StringUtils.hasText(request.getEmail()) && !StringUtils.hasText(request.getPassword()))) {
-            throw new IllegalArgumentException("At least one of email or password must be provided");
-        }
-
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-
-        boolean emailUpdated = false;
-        boolean passwordUpdated = false;
-
-        if (StringUtils.hasText(request.getEmail())) {
-            String newEmail = request.getEmail().trim();
-            if (!isValidEmail(newEmail)) {
-                throw new IllegalArgumentException("Invalid email format");
-            }
-            if (!newEmail.equalsIgnoreCase(user.getEmail())) {
-                if (emailExists(newEmail)) {
-                    throw new EmailAlreadyUsedException("Email already in use");
-                }
-                user.setEmail(newEmail);
-                emailUpdated = true;
-            }
-        }
-
-        if (StringUtils.hasText(request.getPassword())) {
-            String newPwd = request.getPassword();
-            if (!isValidPassword(newPwd)) {
-                throw new IllegalArgumentException("Password must meet security requirements");
-            }
-            user.setPassword(passwordEncoder.encode(newPwd));
-            passwordUpdated = true;
-        }
-
-        if (!emailUpdated && !passwordUpdated) {
-            throw new IllegalArgumentException("Nothing to update");
-        }
-
-        try {
-            userRepository.save(user);
-        } catch (DataIntegrityViolationException ex) {
-            throw new EmailAlreadyUsedException("Email already in use");
-        }
-
-        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        String actor = (auth == null) ? "unknown" : auth.getName();
-        log.info("users.admin.update_credentials success actor={} userId={} emailUpdated={} passwordUpdated={}",
-                mask(actor), user.getId(), emailUpdated, passwordUpdated);
-
-        return AdminUpdateCredentialsResponse.builder()
-                .message("Credentials updated successfully")
-                .id(user.getId())
-                .emailUpdated(emailUpdated)
-                .passwordUpdated(passwordUpdated)
-                .build();
     }
 
     private String mask(String email) {

@@ -49,7 +49,6 @@ public class UserController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping
     public ResponseEntity<GetUsersResponse> getUsers(
@@ -74,6 +73,24 @@ public class UserController {
         log.info("users.details request actor={} userId={}", mask(actor), id);
 
         return ResponseEntity.ok(userService.getUserDetails(id));
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PatchMapping("/{userId}/credentials")
+    public ResponseEntity<AdminUpdateCredentialsResponse> updateUserCredentialsByAdmin(
+            @PathVariable @Min(1) Long userId,
+            @Valid @RequestBody AdminUpdateCredentialsRequest request) {
+
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        String actor = (auth == null) ? "unknown" : auth.getName();
+
+        log.info("users.admin.update_credentials request actor={} userId={} hasEmail={} hasPassword={}",
+                mask(actor), userId,
+                StringUtils.hasText(request.getEmail()),
+                StringUtils.hasText(request.getPassword()));
+
+        var resp = userService.updateCredentialsByAdmin(userId, request);
+        return ResponseEntity.ok(resp);
     }
 
     @PutMapping("/change-password")
@@ -144,12 +161,20 @@ public class UserController {
 
         var auth = SecurityContextHolder.getContext().getAuthentication();
         String actor = (auth == null) ? "unknown" : auth.getName();
-        log.info("users.groups.assign request actor={} users={} groups={}",
-                mask(actor),
-                request.getUserIds() == null ? 0 : request.getUserIds().size(),
-                request.getGroupIds() == null ? 0 : request.getGroupIds().size());
 
-        return ResponseEntity.ok(userService.assignUsersToGroups(request));
+        int pairsRequested = (request == null) ? 0
+                : (request.getUserIds() == null || request.getGroupIds() == null)
+                ? 0
+                : request.getUserIds().size() * request.getGroupIds().size();
+
+        log.info("users.groups.assign request actor={} users={} groups={} pairs_requested={}",
+                mask(actor),
+                request == null || request.getUserIds() == null ? 0 : request.getUserIds().size(),
+                request == null || request.getGroupIds() == null ? 0 : request.getGroupIds().size(),
+                pairsRequested);
+
+        var resp = userService.assignUsersToGroups(request);
+        return ResponseEntity.ok(resp);
     }
 
     @PreAuthorize("hasRole('ADMIN')")
@@ -177,24 +202,6 @@ public class UserController {
                 request.getUserIds() == null ? 0 : request.getUserIds().size());
 
         return ResponseEntity.ok(userService.deleteUsers(request));
-    }
-
-    @PreAuthorize("hasRole('ADMIN')")
-    @PatchMapping("/{userId}/credentials")
-    public ResponseEntity<AdminUpdateCredentialsResponse> updateUserCredentialsByAdmin(
-            @PathVariable @Min(1) Long userId,
-            @Valid @RequestBody AdminUpdateCredentialsRequest request) {
-
-        var auth = SecurityContextHolder.getContext().getAuthentication();
-        String actor = (auth == null) ? "unknown" : auth.getName();
-
-        log.info("users.admin.update_credentials request actor={} userId={} hasEmail={} hasPassword={}",
-                mask(actor), userId,
-                StringUtils.hasText(request.getEmail()),
-                StringUtils.hasText(request.getPassword()));
-
-        var resp = userService.updateCredentialsByAdmin(userId, request);
-        return ResponseEntity.ok(resp);
     }
 
     private String mask(String email) {

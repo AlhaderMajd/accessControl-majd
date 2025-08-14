@@ -29,30 +29,6 @@ public class RoleService {
     private final UserRoleService userRoleService;
 
     @Transactional
-    public Role getOrCreateRole(String roleName) {
-        return roleRepository.findByName(roleName)
-                .orElseGet(() -> {
-                    try {
-                        return roleRepository.save(Role.builder().name(roleName).build());
-                    } catch (DataIntegrityViolationException e) {
-                        return roleRepository.findByName(roleName).orElseThrow(() -> e);
-                    }
-                });
-    }
-
-    @Transactional(readOnly = true)
-    public List<Role> getByIdsOrThrow(List<Long> ids) {
-        List<Role> roles = roleRepository.findAllById(ids);
-        if (roles.size() != ids.size()) throw new ResourceNotFoundException("Some roles not found");
-        return roles;
-    }
-
-    @Transactional(readOnly = true)
-    public List<Long> getExistingIds(List<Long> ids) {
-        return roleRepository.findAllById(ids).stream().map(Role::getId).toList();
-    }
-
-    @Transactional
     public CreateRoleResponse createRoles(List<CreateRoleRequest> requests) {
         if (requests == null || requests.isEmpty()
                 || requests.stream().anyMatch(r -> r.getName() == null || r.getName().isBlank())) {
@@ -446,6 +422,30 @@ public class RoleService {
         return roleRepository.findAllById(roleIds).stream()
                 .map(r -> RoleResponse.builder().id(r.getId()).name(r.getName()).build())
                 .toList();
+    }
+
+    @Transactional
+    public Role getOrCreateRole(String roleName) {
+        return roleRepository.findByName(roleName)
+                .orElseGet(() -> {
+                    try {
+                        return roleRepository.save(Role.builder().name(roleName).build());
+                    } catch (DataIntegrityViolationException e) {
+                        return roleRepository.findByName(roleName).orElseThrow(() -> e);
+                    }
+                });
+    }
+
+    @Transactional(readOnly = true)
+    public List<Role> getByIdsOrThrow(List<Long> ids) {
+        List<Role> roles = roleRepository.findAllById(ids);
+        if (roles.size() != ids.size()) throw new ResourceNotFoundException("Some roles not found");
+        return roles;
+    }
+
+    @Transactional(readOnly = true)
+    public List<Long> getExistingIds(List<Long> ids) {
+        return roleRepository.findAllById(ids).stream().map(Role::getId).toList();
     }
 
     private String mask(String email) {

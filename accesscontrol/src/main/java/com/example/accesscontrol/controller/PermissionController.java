@@ -29,7 +29,7 @@ public class PermissionController {
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public CreatePermissionsResponse create(@Valid @RequestBody CreatePermissionsRequest request) {
+    public CreatePermissionsResponse createPermissions(@Valid @RequestBody CreatePermissionsRequest request) {
         var auth = SecurityContextHolder.getContext().getAuthentication();
         String actor = (auth == null) ? "unknown" : auth.getName();
         int count = request == null || request.getPermissions() == null ? 0 : request.getPermissions().size();
@@ -40,7 +40,7 @@ public class PermissionController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping
-    public PageResponse<PermissionResponse> list(
+    public PageResponse<PermissionResponse> getPermissions(
             @RequestParam(defaultValue = "") String search,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size) {
@@ -55,7 +55,7 @@ public class PermissionController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/{permissionId}")
-    public PermissionResponse details(@PathVariable @Min(1) Long permissionId) {
+    public PermissionResponse getPermissionsDetails(@PathVariable @Min(1) Long permissionId) {
         var auth = SecurityContextHolder.getContext().getAuthentication();
         String actor = (auth == null) ? "unknown" : auth.getName();
         log.info("permissions.details request actor={} permissionId={}", mask(actor), permissionId);
@@ -65,7 +65,7 @@ public class PermissionController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{permissionId}")
-    public UpdatePermissionNameResponse updateName(
+    public UpdatePermissionNameResponse updatePermissionName(
             @PathVariable @Min(1) Long permissionId,
             @Valid @RequestBody UpdatePermissionNameRequest request) {
 
@@ -79,7 +79,7 @@ public class PermissionController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping
-    public MessageResponse delete(@RequestBody List<Long> permissionIds) {
+    public MessageResponse deletePermissions(@RequestBody List<Long> permissionIds) {
         var auth = SecurityContextHolder.getContext().getAuthentication();
         String actor = (auth == null) ? "unknown" : auth.getName();
         log.info("permissions.delete request actor={} count={}",
