@@ -13,10 +13,11 @@ public interface PermissionRepository extends JpaRepository<Permission, Long> {
     Page<Permission> findByNameContainingIgnoreCase(String name, Pageable pageable);
 
     @Query("""
-               SELECT p
-               FROM RolePermission rp
-               JOIN rp.permission p
-               WHERE rp.role.id = :roleId
-            """)
+       SELECT p
+       FROM RolePermission rp
+       JOIN rp.permission p
+       WHERE rp.role.id = :roleId
+       ORDER BY p.name ASC, p.id ASC
+       """)
     List<Permission> findByRoleId(@Param("roleId") Long roleId);
 }

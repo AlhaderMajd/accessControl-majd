@@ -16,7 +16,6 @@ public interface UserGroupRepository extends JpaRepository<UserGroup, Long> {
     void deleteByUser_IdIn(List<Long> userIds);
     void deleteByGroup_IdIn(List<Long> groupIds);
 
-    //n+1
     @Query("""
            SELECT g.name
            FROM UserGroup ug

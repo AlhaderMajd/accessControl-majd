@@ -5,6 +5,7 @@ import com.example.accesscontrol.entity.Role;
 import com.example.accesscontrol.entity.RolePermission;
 import com.example.accesscontrol.repository.RolePermissionRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,34 +25,68 @@ public class RolePermissionService {
     }
 
     @Transactional
-    public int assignPermissionsToRoles(List<Long> roleIds, List<Long> permissionIds) {
-        if (roleIds == null || permissionIds == null || roleIds.isEmpty() || permissionIds.isEmpty()) {
-            return 0;
-        }
+    public int assignRolePermissionPairs(Map<Long, Set<Long>> wanted) {
+        if (wanted == null || wanted.isEmpty()) return 0;
 
-        var existing = rolePermissionRepository.findByRole_IdInAndPermission_IdIn(roleIds, permissionIds);
-        Set<String> existingKeys = existing.stream().map(rp -> rp.getRole().getId() + "_" + rp.getPermission().getId()).collect(Collectors.toSet());
+        var roleIds = new java.util.ArrayList<>(wanted.keySet());
+        var allPermissionIds = wanted.values().stream().flatMap(Set::stream).distinct().toList();
 
-        List<RolePermission> toInsert = new ArrayList<>();
-        for (Long rId : roleIds) {
-            for (Long pId : permissionIds) {
-                String key = rId + "_" + pId;
+        var existingBefore = rolePermissionRepository
+                .findByRole_IdInAndPermission_IdIn(roleIds, allPermissionIds);
+        var existingKeys = existingBefore.stream()
+                .map(rp -> rp.getRole().getId() + "_" + rp.getPermission().getId())
+                .collect(java.util.stream.Collectors.toSet());
+
+        java.util.List<RolePermission> toInsert = new java.util.ArrayList<>();
+        for (var e : wanted.entrySet()) {
+            Long roleId = e.getKey();
+            for (Long permId : e.getValue()) {
+                String key = roleId + "_" + permId;
                 if (!existingKeys.contains(key)) {
                     RolePermission rp = new RolePermission();
-                    rp.setRole(Role.builder().id(rId).build());
-                    rp.setPermission(Permission.builder().id(pId).build());
+                    rp.setRole(Role.builder().id(roleId).build());
+                    rp.setPermission(Permission.builder().id(permId).build());
                     toInsert.add(rp);
                 }
             }
         }
-        if (!toInsert.isEmpty()) rolePermissionRepository.saveAll(toInsert);
-        return toInsert.size();
+        if (toInsert.isEmpty()) return 0;
+
+        try {
+            rolePermissionRepository.saveAll(toInsert);
+            return toInsert.size();
+        } catch (DataIntegrityViolationException ex) {
+            var after = rolePermissionRepository
+                    .findByRole_IdInAndPermission_IdIn(roleIds, allPermissionIds);
+            return Math.max(0, after.size() - existingBefore.size());
+        }
     }
 
     @Transactional
-    public int deassignPermissionsFromRoles(List<Long> roleIds, List<Long> permissionIds) {
-        if (roleIds == null || roleIds.isEmpty() || permissionIds == null || permissionIds.isEmpty()) return 0;
-        return rolePermissionRepository.deleteByRole_IdInAndPermission_IdIn(roleIds, permissionIds);
+    public int deleteRolePermissionPairs(Map<Long, Set<Long>> wanted) {
+        if (wanted == null || wanted.isEmpty()) return 0;
+
+        var roleIds = new java.util.ArrayList<>(wanted.keySet());
+        var permIds = wanted.values().stream().flatMap(Set::stream).distinct().toList();
+
+        var existing = rolePermissionRepository.findByRole_IdInAndPermission_IdIn(roleIds, permIds);
+
+        Set<String> wantedKeys = new java.util.HashSet<>();
+        for (var e : wanted.entrySet()) {
+            Long roleId = e.getKey();
+            for (Long pid : e.getValue()) {
+                wantedKeys.add(roleId + "_" + pid);
+            }
+        }
+
+        var toDelete = existing.stream()
+                .filter(rp -> wantedKeys.contains(rp.getRole().getId() + "_" + rp.getPermission().getId()))
+                .toList();
+
+        if (toDelete.isEmpty()) return 0;
+
+        rolePermissionRepository.deleteAllInBatch(toDelete);
+        return toDelete.size();
     }
 
     @Transactional

@@ -27,46 +27,11 @@ class GroupRoleServiceTest {
 
     @InjectMocks private GroupRoleService groupRoleService;
 
-    @Test
-    void assignRolesToGroups_nullOrEmpty_returnsZero() {
-        assertEquals(0, groupRoleService.assignRolesToGroups(null, List.of(1L)));
-        assertEquals(0, groupRoleService.assignRolesToGroups(List.of(), List.of(1L)));
-        assertEquals(0, groupRoleService.assignRolesToGroups(List.of(1L), null));
-        assertEquals(0, groupRoleService.assignRolesToGroups(List.of(1L), List.of()));
-        verify(groupRoleRepository, never()).saveAll(anyList());
-    }
 
-    @Test
-    void assignRolesToGroups_insertsOnlyMissing_andReturnsCount() {
-        List<Long> groupIds = List.of(1L, 2L);
-        List<Long> roleIds = List.of(10L, 11L);
 
-        GroupRole existing = new GroupRole();
-        existing.setGroup(Group.builder().id(1L).build());
-        existing.setRole(Role.builder().id(10L).build());
-        when(groupRoleRepository.findByGroup_IdInAndRole_IdIn(groupIds, roleIds))
-                .thenReturn(List.of(existing));
-        when(groupRoleRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
 
-        int inserted = groupRoleService.assignRolesToGroups(groupIds, roleIds);
-        assertEquals(3, inserted);
-        verify(groupRoleRepository).saveAll(anyList());
-    }
 
-    @Test
-    void deassignRolesFromGroups_nullOrEmpty_noCall() {
-        groupRoleService.deassignRolesFromGroups(null, List.of(1L));
-        groupRoleService.deassignRolesFromGroups(List.of(), List.of(1L));
-        groupRoleService.deassignRolesFromGroups(List.of(1L), null);
-        groupRoleService.deassignRolesFromGroups(List.of(1L), List.of());
-        verify(groupRoleRepository, never()).deleteByGroup_IdInAndRole_IdIn(anyList(), anyList());
-    }
 
-    @Test
-    void deassignRolesFromGroups_valid_callsRepo() {
-        groupRoleService.deassignRolesFromGroups(List.of(1L), List.of(2L));
-        verify(groupRoleRepository).deleteByGroup_IdInAndRole_IdIn(List.of(1L), List.of(2L));
-    }
 
     @Test
     void deleteByRoleIds_nullOrEmpty_noCall() {

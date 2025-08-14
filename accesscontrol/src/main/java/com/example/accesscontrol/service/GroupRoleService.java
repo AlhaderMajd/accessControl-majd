@@ -7,6 +7,7 @@ import com.example.accesscontrol.repository.GroupRepository;
 import com.example.accesscontrol.repository.GroupRoleRepository;
 import com.example.accesscontrol.repository.RoleRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,17 +22,21 @@ public class GroupRoleService {
     private final RoleRepository roleRepository;
 
     @Transactional
-    public int assignRolesToGroups(List<Long> groupIds, List<Long> roleIds) {
-        if (groupIds == null || groupIds.isEmpty() || roleIds == null || roleIds.isEmpty()) return 0;
+    public int assignGroupRolePairs(Map<Long, Set<Long>> wanted) {
+        if (wanted == null || wanted.isEmpty()) return 0;
 
-        var existing = groupRoleRepository.findByGroup_IdInAndRole_IdIn(groupIds, roleIds);
-        Set<String> existingKeys = existing.stream()
+        var groupIds = new java.util.ArrayList<>(wanted.keySet());
+        var roleIds = wanted.values().stream().flatMap(Set::stream).distinct().toList();
+
+        var existingBefore = groupRoleRepository.findByGroup_IdInAndRole_IdIn(groupIds, roleIds);
+        var existingKeys = existingBefore.stream()
                 .map(gr -> gr.getGroup().getId() + "_" + gr.getRole().getId())
                 .collect(java.util.stream.Collectors.toSet());
 
-        List<GroupRole> toInsert = new ArrayList<>();
-        for (Long gId : groupIds) {
-            for (Long rId : roleIds) {
+        List<GroupRole> toInsert = new java.util.ArrayList<>();
+        for (var e : wanted.entrySet()) {
+            Long gId = e.getKey();
+            for (Long rId : e.getValue()) {
                 String key = gId + "_" + rId;
                 if (!existingKeys.contains(key)) {
                     GroupRole gr = new GroupRole();
@@ -41,14 +46,42 @@ public class GroupRoleService {
                 }
             }
         }
-        if (!toInsert.isEmpty()) groupRoleRepository.saveAll(toInsert);
-        return toInsert.size();
+        if (toInsert.isEmpty()) return 0;
+
+        try {
+            groupRoleRepository.saveAll(toInsert);
+            return toInsert.size();
+        } catch (DataIntegrityViolationException ex) {
+            var after = groupRoleRepository.findByGroup_IdInAndRole_IdIn(groupIds, roleIds);
+            return Math.max(0, after.size() - existingBefore.size());
+        }
     }
 
     @Transactional
-    public void deassignRolesFromGroups(List<Long> groupIds, List<Long> roleIds) {
-        if (groupIds == null || groupIds.isEmpty() || roleIds == null || roleIds.isEmpty()) return;
-        groupRoleRepository.deleteByGroup_IdInAndRole_IdIn(groupIds, roleIds);
+    public int deleteGroupRolePairs(Map<Long, Set<Long>> wanted) {
+        if (wanted == null || wanted.isEmpty()) return 0;
+
+        var groupIds = new java.util.ArrayList<>(wanted.keySet());
+        var roleIds = wanted.values().stream().flatMap(Set::stream).distinct().toList();
+
+        var existing = groupRoleRepository.findByGroup_IdInAndRole_IdIn(groupIds, roleIds);
+
+        Set<String> wantedKeys = new java.util.HashSet<>();
+        for (var e : wanted.entrySet()) {
+            Long gId = e.getKey();
+            for (Long rId : e.getValue()) {
+                wantedKeys.add(gId + "_" + rId);
+            }
+        }
+
+        var toDelete = existing.stream()
+                .filter(gr -> wantedKeys.contains(gr.getGroup().getId() + "_" + gr.getRole().getId()))
+                .toList();
+
+        if (toDelete.isEmpty()) return 0;
+
+        groupRoleRepository.deleteAllInBatch(toDelete);
+        return toDelete.size();
     }
 
     @Transactional

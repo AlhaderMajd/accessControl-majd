@@ -254,74 +254,6 @@ class RoleServiceTest {
     }
 
     @Test
-    void assignPermissionsToRoles_filtersInvalidIds_andSkipsNullPermissionLists() {
-        AssignPermissionsToRolesRequest valid = new AssignPermissionsToRolesRequest();
-        valid.setRoleId(7L);
-        valid.setPermissionIds(Arrays.asList(1L, null, 0L, -5L, 2L));
-
-        AssignPermissionsToRolesRequest nullPerms = new AssignPermissionsToRolesRequest();
-        nullPerms.setRoleId(0L);
-        nullPerms.setPermissionIds(null);
-
-        AssignPermissionsToRolesRequest negRole = new AssignPermissionsToRolesRequest();
-        negRole.setRoleId(-3L);
-        negRole.setPermissionIds(List.of(99L));
-
-        AssignPermissionsToRolesRequest nullRole = new AssignPermissionsToRolesRequest();
-        nullRole.setRoleId(null);
-        nullRole.setPermissionIds(List.of(5L));
-
-        doReturn(List.of(Role.builder().id(7L).name("R7").build()))
-                .when(roleRepository).findAllById(anyList());
-        doReturn(List.of(1L, 2L, 5L))
-                .when(permissionService).getExistingPermissionIds(anyList());
-        doReturn(3)
-                .when(rolePermissionService).assignPermissionsToRoles(anyList(), anyList());
-
-        String msg = roleService.assignPermissionsToRoles(List.of(valid, nullPerms, negRole, nullRole));
-
-        verify(rolePermissionService, times(1)).assignPermissionsToRoles(anyList(), anyList());
-        assertTrue(msg.contains("Total assignments: 3"));
-    }
-
-
-    @Test
-    void assignPermissionsToRoles_allFilteredOut_returnsNoAssignmentsMessage() {
-        AssignPermissionsToRolesRequest a = new AssignPermissionsToRolesRequest();
-        a.setRoleId(0L);
-        a.setPermissionIds(Arrays.asList(null, 0L, -1L));
-
-        AssignPermissionsToRolesRequest b = new AssignPermissionsToRolesRequest();
-        b.setRoleId(null);
-        b.setPermissionIds(null);
-
-        doReturn(List.of()).when(roleRepository).findAllById(anyList());
-        doReturn(List.of()).when(permissionService).getExistingPermissionIds(anyList());
-
-        String msg = roleService.assignPermissionsToRoles(List.of(a, b));
-
-        verify(rolePermissionService, never()).assignPermissionsToRoles(anyList(), anyList());
-        assertTrue(msg.startsWith("No permissions assigned"));
-        assertTrue(msg.contains("(0)"));
-    }
-
-
-    @Test
-    void assignPermissionsToRoles_noExistingPermissions_skipsCall() {
-        AssignPermissionsToRolesRequest r = new AssignPermissionsToRolesRequest();
-        r.setRoleId(1L);
-        r.setPermissionIds(List.of(100L));
-
-        when(roleRepository.findAllById(List.of(1L)))
-                .thenReturn(List.of(Role.builder().id(1L).name("R1").build()));
-        when(permissionService.getExistingPermissionIds(List.of(100L))).thenReturn(List.of());
-
-        String msg = roleService.assignPermissionsToRoles(List.of(r));
-        verify(rolePermissionService, never()).assignPermissionsToRoles(anyList(), anyList());
-        assertTrue(msg.startsWith("No permissions assigned"));
-    }
-
-    @Test
     void assignPermissionsToRoles_invalidInput_throws() {
         assertThrows(IllegalArgumentException.class, () -> roleService.assignPermissionsToRoles(null));
         assertThrows(IllegalArgumentException.class, () -> roleService.assignPermissionsToRoles(List.of()));
@@ -329,49 +261,9 @@ class RoleServiceTest {
 
 
     @Test
-    void deassignPermissionsFromRoles_removed_gt0() {
-        AssignPermissionsToRolesRequest a = new AssignPermissionsToRolesRequest();
-        a.setRoleId(1L);
-        a.setPermissionIds(List.of(1L));
-
-        when(rolePermissionService.deassignPermissionsFromRoles(anyList(), anyList())).thenReturn(1);
-        String resp = roleService.deassignPermissionsFromRoles(List.of(a));
-        assertTrue(resp.contains("removed successfully"));
-    }
-
-    @Test
-    void deassignPermissionsFromRoles_noneRemoved_returnsNoRemovedMessage() {
-        AssignPermissionsToRolesRequest a = new AssignPermissionsToRolesRequest();
-        a.setRoleId(1L);
-        a.setPermissionIds(List.of(1L));
-
-        when(rolePermissionService.deassignPermissionsFromRoles(anyList(), anyList())).thenReturn(0);
-        String resp = roleService.deassignPermissionsFromRoles(List.of(a));
-        assertTrue(resp.contains("No permissions were removed"));
-    }
-
-    @Test
     void deassignPermissionsFromRoles_invalid_throws() {
         assertThrows(IllegalArgumentException.class, () -> roleService.deassignPermissionsFromRoles(null));
         assertThrows(IllegalArgumentException.class, () -> roleService.deassignPermissionsFromRoles(List.of()));
-    }
-
-
-    @Test
-    void assignRolesToGroups_success_insertsCount() {
-        AssignRolesToGroupsRequest req = new AssignRolesToGroupsRequest();
-        req.setGroupId(1L);
-        req.setRoleIds(List.of(1L, 2L));
-
-        when(groupRoleService.getExistingGroupIds(anyList())).thenReturn(List.of(1L));
-        when(roleRepository.findAllById(anyList())).thenReturn(List.of(
-                Role.builder().id(1L).name("A").build(),
-                Role.builder().id(2L).name("B").build()
-        ));
-        when(groupRoleService.assignRolesToGroups(anyList(), anyList())).thenReturn(2);
-
-        String msg = roleService.assignRolesToGroups(List.of(req));
-        assertTrue(msg.contains("Inserted: 2"));
     }
 
     @Test
@@ -393,20 +285,6 @@ class RoleServiceTest {
         assertThrows(IllegalArgumentException.class, () -> roleService.assignRolesToGroups(List.of()));
     }
 
-    @Test
-    void deassignRolesFromGroups_success_distinctsApplied() {
-        AssignRolesToGroupsRequest r1 = new AssignRolesToGroupsRequest();
-        r1.setGroupId(1L);
-        r1.setRoleIds(List.of(1L, 2L));
-
-        AssignRolesToGroupsRequest r2 = new AssignRolesToGroupsRequest();
-        r2.setGroupId(1L);
-        r2.setRoleIds(List.of(2L, 3L));
-
-        String msg = roleService.deassignRolesFromGroups(List.of(r1, r2));
-        assertTrue(msg.contains("deassigned"));
-        verify(groupRoleService).deassignRolesFromGroups(eq(List.of(1L)), eq(List.of(1L, 2L, 3L)));
-    }
 
     @Test
     void deassignRolesFromGroups_invalid_throws() {

@@ -55,6 +55,11 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Something went wrong: " + ex.getMessage());
     }
 
+    @ExceptionHandler(DuplicateResourceException.class)
+    public ResponseEntity<Map<String, Object>> handleDuplicate(DuplicateResourceException ex) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
     private ResponseEntity<Map<String, Object>> buildResponse(HttpStatus status, String message) {
         return ResponseEntity.status(status).body(
                 Map.of(

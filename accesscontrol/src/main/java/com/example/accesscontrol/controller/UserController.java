@@ -29,6 +29,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -180,8 +181,20 @@ public class UserController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/{userId}/credentials")
-    public ResponseEntity<AdminUpdateCredentialsResponse> updateUserCredentialsByAdmin(@PathVariable Long userId, @RequestBody AdminUpdateCredentialsRequest request) {
-        return ResponseEntity.ok(userService.updateCredentialsByAdmin(userId, request));
+    public ResponseEntity<AdminUpdateCredentialsResponse> updateUserCredentialsByAdmin(
+            @PathVariable @Min(1) Long userId,
+            @Valid @RequestBody AdminUpdateCredentialsRequest request) {
+
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        String actor = (auth == null) ? "unknown" : auth.getName();
+
+        log.info("users.admin.update_credentials request actor={} userId={} hasEmail={} hasPassword={}",
+                mask(actor), userId,
+                StringUtils.hasText(request.getEmail()),
+                StringUtils.hasText(request.getPassword()));
+
+        var resp = userService.updateCredentialsByAdmin(userId, request);
+        return ResponseEntity.ok(resp);
     }
 
     private String mask(String email) {

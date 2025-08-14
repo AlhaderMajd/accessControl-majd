@@ -4,6 +4,7 @@ import com.example.accesscontrol.dto.group.AssignRolesToGroupsRequest;
 import com.example.accesscontrol.dto.permission.PermissionResponse;
 import com.example.accesscontrol.dto.role.*;
 import com.example.accesscontrol.entity.*;
+import com.example.accesscontrol.exception.DuplicateResourceException;
 import com.example.accesscontrol.exception.ResourceNotFoundException;
 import com.example.accesscontrol.repository.RoleRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -158,11 +159,15 @@ public class RoleService {
 
     @Transactional(readOnly = true)
     public RoleDetailsResponse getRoleWithPermissions(Long roleId) {
-        Role role = roleRepository.findById(roleId).orElseThrow(() -> new ResourceNotFoundException("Role not found"));
+        Role role = roleRepository.findById(roleId)
+                .orElseThrow(() -> new ResourceNotFoundException("Role not found"));
+
         List<Permission> permissions = permissionService.getPermissionsByRoleId(roleId);
+
         var permDtos = permissions.stream()
                 .map(p -> PermissionResponse.builder().id(p.getId()).name(p.getName()).build())
                 .toList();
+
         return RoleDetailsResponse.builder()
                 .id(role.getId())
                 .name(role.getName())
@@ -172,12 +177,43 @@ public class RoleService {
 
     @Transactional
     public UpdateRoleResponse updateRoleName(Long roleId, UpdateRoleRequest request) {
-        if (request.getName() == null || request.getName().isBlank())
+        String newName = request.getName() == null ? null : request.getName().trim();
+        if (newName == null || newName.isEmpty() || newName.length() > 100) {
             throw new IllegalArgumentException("Invalid role name");
-        Role role = roleRepository.findById(roleId).orElseThrow(() -> new ResourceNotFoundException("Role not found"));
-        role.setName(request.getName());
-        roleRepository.save(role);
-        return UpdateRoleResponse.builder().message("Role name updated successfully").build();
+        }
+
+        Role role = roleRepository.findById(roleId)
+                .orElseThrow(() -> new ResourceNotFoundException("Role not found"));
+
+        if (newName.equals(role.getName())) {
+            log.info("roles.update_name no_change roleId={}", roleId);
+            return UpdateRoleResponse.builder()
+                    .message("Role name updated successfully")
+                    .build();
+        }
+
+        roleRepository.findByName(newName).ifPresent(existing -> {
+            if (!existing.getId().equals(roleId)) {
+                throw new DuplicateResourceException("Role name already exists");
+            }
+        });
+
+        String old = role.getName();
+        role.setName(newName);
+        try {
+            roleRepository.save(role);
+        } catch (DataIntegrityViolationException e) {
+            throw new DuplicateResourceException("Role name already exists");
+        }
+
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        String actor = (auth == null) ? "unknown" : auth.getName();
+        log.info("roles.update_name success actor={} roleId={} old='{}' new='{}'",
+                mask(actor), roleId, old, newName);
+
+        return UpdateRoleResponse.builder()
+                .message("Role name updated successfully")
+                .build();
     }
 
     @Transactional
@@ -186,70 +222,222 @@ public class RoleService {
             throw new IllegalArgumentException("Requests cannot be empty");
         }
 
-        List<Long> allRoleIds = requests.stream()
-                .map(AssignPermissionsToRolesRequest::getRoleId)
-                .filter(id -> id != null && id > 0)
-                .distinct()
-                .toList();
+        Map<Long, Set<Long>> wanted = new java.util.LinkedHashMap<>();
+        for (var r : requests) {
+            if (r == null || r.getRoleId() == null || r.getRoleId() <= 0)
+                throw new IllegalArgumentException("Invalid roleId in request");
+            if (r.getPermissionIds() == null || r.getPermissionIds().isEmpty())
+                throw new IllegalArgumentException("permissionIds must not be empty");
 
-        List<Long> allPermissionIds = requests.stream()
-                .flatMap(r -> r.getPermissionIds() != null ? r.getPermissionIds().stream() : java.util.stream.Stream.<Long>empty())
-                .filter(id -> id != null && id > 0)
-                .distinct()
-                .toList();
+            var perms = r.getPermissionIds().stream()
+                    .filter(Objects::nonNull).filter(id -> id > 0)
+                    .collect(java.util.stream.Collectors.toSet());
+            if (perms.isEmpty())
+                throw new IllegalArgumentException("permissionIds must not be empty");
 
-        List<Long> existingRoleIds = roleRepository.findAllById(allRoleIds)
-                .stream().map(Role::getId).toList();
+            wanted.computeIfAbsent(r.getRoleId(), k -> new java.util.LinkedHashSet<>()).addAll(perms);
+        }
+        if (wanted.isEmpty()) throw new IllegalArgumentException("Nothing to assign");
 
-        List<Long> existingPermissionIds = permissionService.getExistingPermissionIds(allPermissionIds);
-
-        if (existingRoleIds.isEmpty() || existingPermissionIds.isEmpty()) {
-            return "No permissions assigned (0). No valid roles or permissions found.";
+        var roleIds = new java.util.ArrayList<>(wanted.keySet());
+        var roles = roleRepository.findAllById(roleIds);
+        if (roles.size() != roleIds.size()) {
+            var found = roles.stream().map(Role::getId).collect(java.util.stream.Collectors.toSet());
+            var missing = roleIds.stream().filter(id -> !found.contains(id)).toList();
+            throw new com.example.accesscontrol.exception.ResourceNotFoundException("Some roles not found: " + missing);
         }
 
-        int assigned = rolePermissionService.assignPermissionsToRoles(existingRoleIds, existingPermissionIds);
+        var allPermissionIds = wanted.values().stream().flatMap(Set::stream).distinct().toList();
+        var existingPermIds = permissionService.getExistingPermissionIds(allPermissionIds);
+        if (existingPermIds.size() != allPermissionIds.size()) {
+            var missing = new java.util.HashSet<>(allPermissionIds);
+            missing.removeAll(existingPermIds);
+            throw new com.example.accesscontrol.exception.ResourceNotFoundException("Some permissions not found: " + missing);
+        }
+
+        int assigned = rolePermissionService.assignRolePermissionPairs(wanted);
+
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        String actor = (auth == null) ? "unknown" : auth.getName();
+        int pairCount = wanted.values().stream().mapToInt(Set::size).sum();
+        log.info("roles.permissions.assign success actor={} roles={} pairs_requested={} assigned={}",
+                mask(actor), wanted.size(), pairCount, assigned);
+
         return "Permissions assigned successfully. Total assignments: " + assigned;
     }
 
 
     @Transactional
     public String deassignPermissionsFromRoles(List<AssignPermissionsToRolesRequest> items) {
-        if (items == null || items.isEmpty()) throw new IllegalArgumentException("Invalid or empty input");
-        Set<Long> roleIds = items.stream().map(AssignPermissionsToRolesRequest::getRoleId).collect(Collectors.toSet());
-        Set<Long> permissionIds = items.stream().flatMap(i -> i.getPermissionIds().stream()).collect(Collectors.toSet());
-        int n = rolePermissionService.deassignPermissionsFromRoles(new ArrayList<>(roleIds), new ArrayList<>(permissionIds));
-        return (n > 0) ? "Permissions removed successfully" : "No permissions were removed";
+        if (items == null || items.isEmpty())
+            throw new IllegalArgumentException("Invalid or empty input");
+
+        Map<Long, Set<Long>> wanted = new java.util.LinkedHashMap<>();
+        for (var it : items) {
+            if (it == null || it.getRoleId() == null || it.getRoleId() <= 0)
+                throw new IllegalArgumentException("Invalid roleId in request");
+            if (it.getPermissionIds() == null || it.getPermissionIds().isEmpty())
+                throw new IllegalArgumentException("permissionIds must not be empty");
+
+            var perms = it.getPermissionIds().stream()
+                    .filter(Objects::nonNull).filter(id -> id > 0)
+                    .collect(java.util.stream.Collectors.toSet());
+            if (perms.isEmpty())
+                throw new IllegalArgumentException("permissionIds must not be empty");
+
+            wanted.computeIfAbsent(it.getRoleId(), k -> new java.util.LinkedHashSet<>()).addAll(perms);
+        }
+        if (wanted.isEmpty()) throw new IllegalArgumentException("Nothing to deassign");
+
+        var roleIds = new java.util.ArrayList<>(wanted.keySet());
+        var roles = roleRepository.findAllById(roleIds);
+        if (roles.size() != roleIds.size()) {
+            var found = roles.stream().map(Role::getId).collect(java.util.stream.Collectors.toSet());
+            var missing = roleIds.stream().filter(id -> !found.contains(id)).toList();
+            throw new com.example.accesscontrol.exception.ResourceNotFoundException("Some roles not found: " + missing);
+        }
+
+        var allPermIds = wanted.values().stream().flatMap(Set::stream).distinct().toList();
+        var existingPermIds = permissionService.getExistingPermissionIds(allPermIds);
+        if (existingPermIds.size() != allPermIds.size()) {
+            var missing = new java.util.HashSet<>(allPermIds);
+            missing.removeAll(existingPermIds);
+            throw new com.example.accesscontrol.exception.ResourceNotFoundException("Some permissions not found: " + missing);
+        }
+
+        int removed = rolePermissionService.deleteRolePermissionPairs(wanted);
+
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        String actor = (auth == null) ? "unknown" : auth.getName();
+        int pairCount = wanted.values().stream().mapToInt(Set::size).sum();
+        log.info("roles.permissions.deassign success actor={} roles={} pairs_requested={} removed={}",
+                mask(actor), wanted.size(), pairCount, removed);
+
+        return removed > 0 ? "Permissions removed successfully" : "No permissions were removed";
     }
 
     @Transactional
     public String assignRolesToGroups(List<AssignRolesToGroupsRequest> items) {
-        if (items == null || items.isEmpty()) throw new IllegalArgumentException("Invalid or empty input");
-        Set<Long> groupIds = items.stream().map(AssignRolesToGroupsRequest::getGroupId).collect(Collectors.toSet());
-        Set<Long> roleIds = items.stream().flatMap(i -> i.getRoleIds().stream()).collect(Collectors.toSet());
-        var validGroupIds = groupRoleService.getExistingGroupIds(new ArrayList<>(groupIds));
-        var validRoleIds = getByIdsOrThrow(new ArrayList<>(roleIds)).stream().map(Role::getId).toList();
-        int inserted = groupRoleService.assignRolesToGroups(validGroupIds, validRoleIds);
+        if (items == null || items.isEmpty())
+            throw new IllegalArgumentException("Invalid or empty input");
+
+        Map<Long, Set<Long>> wanted = new java.util.LinkedHashMap<>();
+        for (var it : items) {
+            if (it == null || it.getGroupId() == null || it.getGroupId() <= 0)
+                throw new IllegalArgumentException("Invalid groupId in request");
+            if (it.getRoleIds() == null || it.getRoleIds().isEmpty())
+                throw new IllegalArgumentException("roleIds must not be empty");
+
+            var roles = it.getRoleIds().stream()
+                    .filter(Objects::nonNull).filter(id -> id > 0)
+                    .collect(java.util.stream.Collectors.toSet());
+            if (roles.isEmpty())
+                throw new IllegalArgumentException("roleIds must not be empty");
+
+            wanted.computeIfAbsent(it.getGroupId(), k -> new java.util.LinkedHashSet<>()).addAll(roles);
+        }
+        if (wanted.isEmpty()) throw new IllegalArgumentException("Nothing to assign");
+
+        var groupIds = new java.util.ArrayList<>(wanted.keySet());
+        var existingGroupIds = groupRoleService.getExistingGroupIds(groupIds);
+        if (existingGroupIds.size() != groupIds.size()) {
+            var found = new java.util.HashSet<>(existingGroupIds);
+            var missing = groupIds.stream().filter(id -> !found.contains(id)).toList();
+            throw new com.example.accesscontrol.exception.ResourceNotFoundException("Some groups not found: " + missing);
+        }
+
+        var roleIds = wanted.values().stream().flatMap(Set::stream).distinct().toList();
+        getByIdsOrThrow(roleIds);
+
+        int inserted = groupRoleService.assignGroupRolePairs(wanted);
+
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        String actor = (auth == null) ? "unknown" : auth.getName();
+        int pairCount = wanted.values().stream().mapToInt(Set::size).sum();
+        log.info("roles.groups.assign success actor={} groups={} pairs_requested={} inserted={}",
+                mask(actor), wanted.size(), pairCount, inserted);
+
         return "Roles assigned to groups successfully. Inserted: " + inserted;
     }
 
     @Transactional
     public String deassignRolesFromGroups(List<AssignRolesToGroupsRequest> items) {
-        if (items == null || items.isEmpty()) throw new IllegalArgumentException("Invalid or empty input");
-        var groupIds = items.stream().map(AssignRolesToGroupsRequest::getGroupId).distinct().toList();
-        var roleIds = items.stream().flatMap(i -> i.getRoleIds().stream()).distinct().toList();
-        groupRoleService.deassignRolesFromGroups(groupIds, roleIds);
-        return "Roles deassigned from groups successfully";
+        if (items == null || items.isEmpty())
+            throw new IllegalArgumentException("Invalid or empty input");
+
+        Map<Long, Set<Long>> wanted = new java.util.LinkedHashMap<>();
+        for (var it : items) {
+            if (it == null || it.getGroupId() == null || it.getGroupId() <= 0)
+                throw new IllegalArgumentException("Invalid groupId in request");
+            if (it.getRoleIds() == null || it.getRoleIds().isEmpty())
+                throw new IllegalArgumentException("roleIds must not be empty");
+
+            var normRoleIds = it.getRoleIds().stream()
+                    .filter(Objects::nonNull).filter(id -> id > 0)
+                    .collect(java.util.stream.Collectors.toSet());
+            if (normRoleIds.isEmpty())
+                throw new IllegalArgumentException("roleIds must not be empty");
+
+            wanted.computeIfAbsent(it.getGroupId(), k -> new java.util.LinkedHashSet<>()).addAll(normRoleIds);
+        }
+        if (wanted.isEmpty()) throw new IllegalArgumentException("Nothing to deassign");
+
+        var groupIds = new java.util.ArrayList<>(wanted.keySet());
+        var existingGroupIds = groupRoleService.getExistingGroupIds(groupIds);
+        if (existingGroupIds.size() != groupIds.size()) {
+            var found = new java.util.HashSet<>(existingGroupIds);
+            var missing = groupIds.stream().filter(id -> !found.contains(id)).toList();
+            throw new com.example.accesscontrol.exception.ResourceNotFoundException("Some groups not found: " + missing);
+        }
+
+        var roleIds = wanted.values().stream().flatMap(Set::stream).distinct().toList();
+        getByIdsOrThrow(roleIds);
+
+        int removed = groupRoleService.deleteGroupRolePairs(wanted);
+
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        String actor = (auth == null) ? "unknown" : auth.getName();
+        int pairCount = wanted.values().stream().mapToInt(Set::size).sum();
+        log.info("roles.groups.deassign success actor={} groups={} pairs_requested={} removed={}",
+                mask(actor), wanted.size(), pairCount, removed);
+
+        return (removed > 0) ? "Roles deassigned from groups successfully"
+                : "No roles were deassigned from groups";
     }
 
     @Transactional
     public String deleteRoles(List<Long> roleIds) {
-        if (roleIds == null || roleIds.isEmpty()) throw new IllegalArgumentException("No role IDs provided");
-        List<Long> existingIds = roleRepository.findAllById(roleIds).stream().map(Role::getId).toList();
-        if (existingIds.size() != roleIds.size()) throw new NoSuchElementException("One or more role IDs do not exist");
-        rolePermissionService.deleteByRoleIds(roleIds);
-        groupRoleService.deleteByRoleIds(roleIds);
-        userRoleService.deleteByRoleIds(roleIds);
-        roleRepository.deleteAllById(roleIds);
+        if (roleIds == null || roleIds.isEmpty())
+            throw new IllegalArgumentException("No role IDs provided");
+
+        var ids = roleIds.stream()
+                .filter(Objects::nonNull).filter(id -> id > 0)
+                .distinct().toList();
+        if (ids.isEmpty())
+            throw new IllegalArgumentException("No valid role IDs provided");
+
+        var existing = roleRepository.findAllById(ids);
+        if (existing.size() != ids.size()) {
+            var found = existing.stream().map(Role::getId).collect(java.util.stream.Collectors.toSet());
+            var missing = ids.stream().filter(id -> !found.contains(id)).toList();
+            throw new com.example.accesscontrol.exception.ResourceNotFoundException("One or more role IDs do not exist: " + missing);
+        }
+
+        try {
+            rolePermissionService.deleteByRoleIds(ids);
+            groupRoleService.deleteByRoleIds(ids);
+            userRoleService.deleteByRoleIds(ids);
+
+            roleRepository.deleteAllByIdInBatch(ids);
+        } catch (DataIntegrityViolationException ex) {
+            throw new IllegalArgumentException("Cannot delete roles due to existing references: " +
+                    (ex.getMostSpecificCause() == null ? ex.getMessage() : ex.getMostSpecificCause().getMessage()));
+        }
+
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        String actor = (auth == null) ? "unknown" : auth.getName();
+        log.info("roles.delete success actor={} deleted={}", mask(actor), ids.size());
+
         return "Roles deleted successfully";
     }
 
