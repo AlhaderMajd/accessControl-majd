@@ -1,6 +1,7 @@
 package com.example.accesscontrol.service;
 
 import com.example.accesscontrol.entity.User;
+import com.example.accesscontrol.exception.UserNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -18,10 +19,16 @@ public class CustomUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        User u = userService.getByEmailOrThrow(email);
+        final User u;
+        try {
+            u = userService.getByEmailOrThrow(email);
+        } catch (UserNotFoundException ex) {
+            throw new UsernameNotFoundException(ex.getMessage(), ex);
+        }
+
         List<String> roleNames = userRoleService.getRoleNamesByUserId(u.getId());
         List<GrantedAuthority> authorities = roleNames.stream()
-                .map(role -> (GrantedAuthority) new SimpleGrantedAuthority("ROLE_" + role))
+                .map(r -> (GrantedAuthority) new SimpleGrantedAuthority("ROLE_" + r))
                 .toList();
 
         return org.springframework.security.core.userdetails.User.builder()

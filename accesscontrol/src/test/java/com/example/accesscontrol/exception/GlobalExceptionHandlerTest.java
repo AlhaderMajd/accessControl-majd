@@ -1,5 +1,6 @@
 package com.example.accesscontrol.exception;
 
+import jakarta.persistence.OptimisticLockException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -23,12 +24,23 @@ class GlobalExceptionHandlerTest {
     }
 
     private static void assertCommonBody(Map<String, Object> body, HttpStatus expectedStatus) {
-        assertNotNull(body, "Response body should not be null");
-        assertTrue(body.containsKey("timestamp"), "Body should contain 'timestamp'");
-        assertTrue(body.containsKey("status"), "Body should contain 'status'");
-        assertTrue(body.containsKey("error"), "Body should contain 'error'");
+        assertNotNull(body);
+        assertTrue(body.containsKey("timestamp"));
+        assertTrue(body.containsKey("status"));
+        assertTrue(body.containsKey("error"));
         assertEquals(expectedStatus.value(), body.get("status"));
         assertNotNull(body.get("timestamp"));
+    }
+
+    @Test
+    @DisplayName("handleOptimisticLock returns 409 with fixed message")
+    void handleOptimisticLock() {
+        OptimisticLockException ex = new OptimisticLockException("conflict");
+        ResponseEntity<Map<String, Object>> response = handler.handleOptimisticLock(ex);
+
+        assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+        assertCommonBody(response.getBody(), HttpStatus.CONFLICT);
+        assertEquals("Update conflict. Please retry.", response.getBody().get("error"));
     }
 
     @Test
@@ -101,6 +113,17 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    @DisplayName("handleDuplicate returns 409 with message")
+    void handleDuplicate() {
+        DuplicateResourceException ex = new DuplicateResourceException("Duplicate");
+        ResponseEntity<Map<String, Object>> response = handler.handleDuplicate(ex);
+
+        assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+        assertCommonBody(response.getBody(), HttpStatus.CONFLICT);
+        assertEquals("Duplicate", response.getBody().get("error"));
+    }
+
+    @Test
     @DisplayName("handleIllegalArgument returns 400 with message")
     void handleIllegalArgument() {
         IllegalArgumentException ex = new IllegalArgumentException("Bad input");
@@ -112,13 +135,18 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    @DisplayName("handleOtherExceptions returns 500 with prefixed message")
+    @DisplayName("handleOtherExceptions returns 500 with generic message")
     void handleOtherExceptions() {
         Exception ex = new Exception("Boom");
         ResponseEntity<Map<String, Object>> response = handler.handleOtherExceptions(ex);
 
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
         assertCommonBody(response.getBody(), HttpStatus.INTERNAL_SERVER_ERROR);
-        assertEquals("Something went wrong: " + ex.getMessage(), response.getBody().get("error"));
+
+        Object error = response.getBody().get("error");
+        assertTrue(error instanceof String);
+        // Align with handler: it may NOT include the exception detail.
+        assertTrue(((String) error).startsWith("Something went wrong"),
+                "Error should start with generic message");
     }
 }

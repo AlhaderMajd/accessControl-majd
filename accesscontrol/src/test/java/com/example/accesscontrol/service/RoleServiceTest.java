@@ -8,18 +8,12 @@ import com.example.accesscontrol.entity.RolePermission;
 import com.example.accesscontrol.exception.DuplicateResourceException;
 import com.example.accesscontrol.exception.ResourceNotFoundException;
 import com.example.accesscontrol.repository.RoleRepository;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
+import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.junit.jupiter.MockitoSettings;
-import org.mockito.quality.Strictness;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.*;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -29,7 +23,6 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@MockitoSettings(strictness = Strictness.LENIENT)
 class RoleServiceTest {
 
     @Mock private RoleRepository roleRepository;
@@ -40,11 +33,7 @@ class RoleServiceTest {
 
     @InjectMocks private RoleService roleService;
 
-    @BeforeEach
-    void defaults() {
-        when(roleRepository.findAllById(anyList())).thenReturn(List.of());
-        when(permissionService.getExistingPermissionIds(anyList())).thenReturn(List.of());
-    }
+    // ---------- getOrCreateRole ----------
 
     @Test
     void getOrCreateRole_createsWhenMissing() {
@@ -71,6 +60,7 @@ class RoleServiceTest {
         verify(roleRepository, never()).save(any());
     }
 
+    // ---------- getByIdsOrThrow & helpers ----------
 
     @Test
     void getByIdsOrThrow_success_and_getExistingIds() {
@@ -81,11 +71,18 @@ class RoleServiceTest {
                 ));
 
         assertEquals(2, roleService.getByIdsOrThrow(List.of(1L, 2L)).size());
+
+        when(roleRepository.findAllById(List.of(1L, 2L)))
+                .thenReturn(List.of(
+                        Role.builder().id(1L).name("A").build(),
+                        Role.builder().id(2L).name("B").build()
+                ));
         assertEquals(List.of(1L, 2L), roleService.getExistingIds(List.of(1L, 2L)));
     }
 
     @Test
     void getByIdsOrThrow_emptyInput_returnsEmpty() {
+        // No stubbing needed: repository not called for empty list
         assertTrue(roleService.getByIdsOrThrow(List.of()).isEmpty());
         assertTrue(roleService.getExistingIds(List.of()).isEmpty());
     }
@@ -96,6 +93,8 @@ class RoleServiceTest {
                 .thenReturn(List.of(Role.builder().id(1L).name("A").build()));
         assertThrows(ResourceNotFoundException.class, () -> roleService.getByIdsOrThrow(List.of(1L, 2L)));
     }
+
+    // ---------- createRoles ----------
 
     @Test
     void createRoles_invalid_whenNullOrEmptyRequests_throws() {
@@ -116,7 +115,7 @@ class RoleServiceTest {
     @Test
     void createRoles_duplicateNames_throws() {
         CreateRoleRequest r = new CreateRoleRequest(); r.setName("ADMIN");
-        when(roleRepository.findExistingNames(anyList())).thenReturn(List.of("ADMIN"));
+        when(roleRepository.findExistingNames(List.of("ADMIN"))).thenReturn(List.of("ADMIN"));
         assertThrows(DuplicateResourceException.class, () -> roleService.createRoles(List.of(r)));
     }
 
@@ -129,8 +128,11 @@ class RoleServiceTest {
         CreateRoleRequest r3 = new CreateRoleRequest();
         r3.setName("R3"); r3.setPermissionIds(List.of());
 
-        when(roleRepository.findExistingNames(anyList())).thenReturn(List.of());
+        when(roleRepository.findExistingNames(List.of("R1", "R2", "R3"))).thenReturn(List.of());
+        when(permissionService.getExistingPermissionIds(List.of(10L, 11L))).thenReturn(List.of(10L, 11L));
+
         when(roleRepository.saveAll(anyList())).thenAnswer(inv -> {
+            @SuppressWarnings("unchecked")
             List<Role> roles = inv.getArgument(0);
             long id = 100;
             for (Role ro : roles) ro.setId(id++);
@@ -159,8 +161,9 @@ class RoleServiceTest {
         CreateRoleRequest a = new CreateRoleRequest(); a.setName("A");
         CreateRoleRequest b = new CreateRoleRequest(); b.setName("B");
 
-        when(roleRepository.findExistingNames(anyList())).thenReturn(List.of());
+        when(roleRepository.findExistingNames(List.of("A", "B"))).thenReturn(List.of());
         when(roleRepository.saveAll(anyList())).thenAnswer(inv -> {
+            @SuppressWarnings("unchecked")
             List<Role> roles = inv.getArgument(0);
             long id = 1;
             for (Role ro : roles) ro.setId(id++);
@@ -173,12 +176,30 @@ class RoleServiceTest {
     }
 
     @Test
+    void createRoles_integrityViolation_rechecksAndThrowsDuplicate() {
+        CreateRoleRequest a = new CreateRoleRequest(); a.setName("A");
+        CreateRoleRequest b = new CreateRoleRequest(); b.setName("B");
+
+        // first check: none exist, second check after integrity violation: "A" exists
+        when(roleRepository.findExistingNames(List.of("A", "B")))
+                .thenReturn(List.of(), List.of("A"));
+        when(roleRepository.saveAll(anyList())).thenThrow(new DataIntegrityViolationException("dup"));
+
+        assertThrows(DuplicateResourceException.class, () -> roleService.createRoles(List.of(a, b)));
+
+        // verify it was called twice with the same argument
+        verify(roleRepository, times(2)).findExistingNames(List.of("A", "B"));
+    }
+
+    // ---------- getRoles (pagination normalized) ----------
+
+    @Test
     void getRoles_nullSearch_usesEmptyString() {
         Page<Role> page = new PageImpl<>(
                 List.of(Role.builder().id(1L).name("ADMIN").build()),
-                PageRequest.of(0, 5), 1
+                PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "id")), 1
         );
-        when(roleRepository.findByNameContainingIgnoreCase(eq(""), any())).thenReturn(page);
+        when(roleRepository.findByNameContainingIgnoreCase(eq(""), any(Pageable.class))).thenReturn(page);
 
         GetRolesResponse resp = roleService.getRoles(null, 0, 5);
         assertEquals(1, resp.getTotal());
@@ -188,7 +209,7 @@ class RoleServiceTest {
     @Test
     void getRoles_emptyPage_ok() {
         Page<Role> page = new PageImpl<>(List.of(), PageRequest.of(1, 5), 0);
-        when(roleRepository.findByNameContainingIgnoreCase(anyString(), any())).thenReturn(page);
+        when(roleRepository.findByNameContainingIgnoreCase(anyString(), any(Pageable.class))).thenReturn(page);
 
         GetRolesResponse resp = roleService.getRoles("x", 1, 5);
         assertEquals(0, resp.getTotal());
@@ -196,13 +217,23 @@ class RoleServiceTest {
     }
 
     @Test
-    void getRoles_invalidPagination_throws() {
-        assertThrows(IllegalArgumentException.class, () -> roleService.getRoles("q", -1, 10));
-        assertThrows(IllegalArgumentException.class, () -> roleService.getRoles("q", 0, 0));
+    void getRoles_normalizesInvalidPagination() {
+        when(roleRepository.findByNameContainingIgnoreCase(anyString(), any(Pageable.class)))
+                .thenAnswer(inv -> {
+                    Pageable p = inv.getArgument(1);
+                    assertEquals(0, p.getPageNumber()); // normalized
+                    assertEquals(1, p.getPageSize());   // normalized
+                    return new PageImpl<Role>(List.of(), p, 0);
+                });
+
+        GetRolesResponse resp = roleService.getRoles("q", -5, 0);
+        assertEquals(0, resp.getPage());
     }
 
+    // ---------- getRoleWithPermissions ----------
+
     @Test
-    void getRoleWithPermissions_mapsToPermissionResponseBuilderLine() {
+    void getRoleWithPermissions_mapsToPermissionResponse() {
         Role r = Role.builder().id(3L).name("ADMIN").build();
         when(roleRepository.findById(3L)).thenReturn(Optional.of(r));
         when(permissionService.getPermissionsByRoleId(3L)).thenReturn(List.of(
@@ -224,6 +255,8 @@ class RoleServiceTest {
         assertThrows(ResourceNotFoundException.class, () -> roleService.getRoleWithPermissions(404L));
     }
 
+    // ---------- updateRoleName ----------
+
     @Test
     void updateRoleName_invalid_whenNullOrBlank_throws() {
         UpdateRoleRequest r1 = new UpdateRoleRequest(); r1.setName(null);
@@ -237,6 +270,7 @@ class RoleServiceTest {
     void updateRoleName_success() {
         Role r = Role.builder().id(4L).name("OLD").build();
         when(roleRepository.findById(4L)).thenReturn(Optional.of(r));
+        when(roleRepository.findByName("NEW")).thenReturn(Optional.empty());
 
         UpdateRoleRequest req = new UpdateRoleRequest();
         req.setName("NEW");
@@ -247,11 +281,18 @@ class RoleServiceTest {
     }
 
     @Test
-    void updateRoleName_notFound_throws() {
-        when(roleRepository.findById(77L)).thenReturn(Optional.empty());
-        UpdateRoleRequest req = new UpdateRoleRequest(); req.setName("X");
-        assertThrows(ResourceNotFoundException.class, () -> roleService.updateRoleName(77L, req));
+    void updateRoleName_duplicate_throws() {
+        Role r = Role.builder().id(4L).name("OLD").build();
+        when(roleRepository.findById(4L)).thenReturn(Optional.of(r));
+        when(roleRepository.findByName("NEW")).thenReturn(Optional.of(Role.builder().id(99L).name("NEW").build()));
+
+        UpdateRoleRequest req = new UpdateRoleRequest();
+        req.setName("NEW");
+
+        assertThrows(DuplicateResourceException.class, () -> roleService.updateRoleName(4L, req));
     }
+
+    // ---------- assign/deassign permissions ----------
 
     @Test
     void assignPermissionsToRoles_invalidInput_throws() {
@@ -259,6 +300,22 @@ class RoleServiceTest {
         assertThrows(IllegalArgumentException.class, () -> roleService.assignPermissionsToRoles(List.of()));
     }
 
+    @Test
+    void assignPermissionsToRoles_success_callsServicesAndReturnsMessage() {
+        var item = new AssignPermissionsToRolesRequest();
+        item.setRoleId(1L);
+        item.setPermissionIds(List.of(10L, 11L));
+
+        when(roleRepository.findAllById(List.of(1L)))
+                .thenReturn(List.of(Role.builder().id(1L).name("R").build()));
+        when(permissionService.getExistingPermissionIds(List.of(10L, 11L)))
+                .thenReturn(List.of(10L, 11L));
+        when(rolePermissionService.assignRolePermissionPairs(anyMap())).thenReturn(2);
+
+        String msg = roleService.assignPermissionsToRoles(List.of(item));
+        assertTrue(msg.contains("Permissions assigned successfully"));
+        verify(rolePermissionService).assignRolePermissionPairs(anyMap());
+    }
 
     @Test
     void deassignPermissionsFromRoles_invalid_throws() {
@@ -267,30 +324,83 @@ class RoleServiceTest {
     }
 
     @Test
+    void deassignPermissionsFromRoles_success_returnsMessage() {
+        var item = new AssignPermissionsToRolesRequest();
+        item.setRoleId(1L);
+        item.setPermissionIds(List.of(10L));
+
+        when(roleRepository.findAllById(List.of(1L)))
+                .thenReturn(List.of(Role.builder().id(1L).name("R").build()));
+        when(permissionService.getExistingPermissionIds(List.of(10L)))
+                .thenReturn(List.of(10L));
+        when(rolePermissionService.deleteRolePermissionPairs(anyMap())).thenReturn(1);
+
+        String msg = roleService.deassignPermissionsFromRoles(List.of(item));
+        assertTrue(msg.contains("Permissions removed successfully"));
+        verify(rolePermissionService).deleteRolePermissionPairs(anyMap());
+    }
+
+    // ---------- assign/deassign roles to groups ----------
+
+    @Test
     void assignRolesToGroups_rolesMissing_triggersGetByIdsOrThrowException() {
         AssignRolesToGroupsRequest req = new AssignRolesToGroupsRequest();
         req.setGroupId(1L);
         req.setRoleIds(List.of(10L, 20L));
 
-        when(groupRoleService.getExistingGroupIds(anyList())).thenReturn(List.of(1L));
+        // group exists
+        when(groupRoleService.getExistingGroupIds(List.of(1L))).thenReturn(List.of(1L));
+
+        // IMPORTANT: don't fix the order; accept any list
         when(roleRepository.findAllById(anyList()))
-                .thenReturn(List.of(Role.builder().id(10L).name("OnlyOne").build()));
+                .thenReturn(List.of(Role.builder().id(10L).name("OnlyOne").build())); // intentionally missing 20L
 
         assertThrows(ResourceNotFoundException.class, () -> roleService.assignRolesToGroups(List.of(req)));
     }
 
-    @Test
-    void assignRolesToGroups_invalid_throws() {
-        assertThrows(IllegalArgumentException.class, () -> roleService.assignRolesToGroups(null));
-        assertThrows(IllegalArgumentException.class, () -> roleService.assignRolesToGroups(List.of()));
-    }
 
+    @Test
+    void assignRolesToGroups_success_returnsMessage() {
+        AssignRolesToGroupsRequest req = new AssignRolesToGroupsRequest();
+        req.setGroupId(5L);
+        req.setRoleIds(List.of(1L, 2L));
+
+        when(groupRoleService.getExistingGroupIds(List.of(5L))).thenReturn(List.of(5L));
+        when(roleRepository.findAllById(List.of(1L, 2L)))
+                .thenReturn(List.of(
+                        Role.builder().id(1L).name("A").build(),
+                        Role.builder().id(2L).name("B").build()
+                ));
+        when(groupRoleService.assignGroupRolePairs(anyMap())).thenReturn(2);
+
+        String msg = roleService.assignRolesToGroups(List.of(req));
+        assertTrue(msg.contains("Roles assigned to groups successfully"));
+        verify(groupRoleService).assignGroupRolePairs(anyMap());
+    }
 
     @Test
     void deassignRolesFromGroups_invalid_throws() {
         assertThrows(IllegalArgumentException.class, () -> roleService.deassignRolesFromGroups(null));
         assertThrows(IllegalArgumentException.class, () -> roleService.deassignRolesFromGroups(List.of()));
     }
+
+    @Test
+    void deassignRolesFromGroups_success_returnsMessage() {
+        AssignRolesToGroupsRequest req = new AssignRolesToGroupsRequest();
+        req.setGroupId(9L);
+        req.setRoleIds(List.of(7L));
+
+        when(groupRoleService.getExistingGroupIds(List.of(9L))).thenReturn(List.of(9L));
+        when(roleRepository.findAllById(List.of(7L)))
+                .thenReturn(List.of(Role.builder().id(7L).name("X").build()));
+        when(groupRoleService.deleteGroupRolePairs(anyMap())).thenReturn(1);
+
+        String msg = roleService.deassignRolesFromGroups(List.of(req));
+        assertTrue(msg.contains("Roles deassigned from groups successfully"));
+        verify(groupRoleService).deleteGroupRolePairs(anyMap());
+    }
+
+    // ---------- deleteRoles ----------
 
     @Test
     void deleteRoles_success_cascades_thenDeletes() {
@@ -303,14 +413,14 @@ class RoleServiceTest {
         verify(rolePermissionService).deleteByRoleIds(List.of(5L));
         verify(groupRoleService).deleteByRoleIds(List.of(5L));
         verify(userRoleService).deleteByRoleIds(List.of(5L));
-        verify(roleRepository).deleteAllById(List.of(5L));
+        verify(roleRepository).deleteAllByIdInBatch(List.of(5L));
     }
 
     @Test
-    void deleteRoles_partialMissing_throws() {
+    void deleteRoles_partialMissing_throwsResourceNotFound() {
         when(roleRepository.findAllById(List.of(1L, 2L)))
                 .thenReturn(List.of(Role.builder().id(1L).name("A").build()));
-        assertThrows(NoSuchElementException.class, () -> roleService.deleteRoles(List.of(1L, 2L)));
+        assertThrows(ResourceNotFoundException.class, () -> roleService.deleteRoles(List.of(1L, 2L)));
     }
 
     @Test
@@ -319,10 +429,14 @@ class RoleServiceTest {
         assertThrows(IllegalArgumentException.class, () -> roleService.deleteRoles(List.of()));
     }
 
+    // ---------- summaries ----------
+
     @Test
     void getRoleSummariesByIds_success_andEmpty() {
         when(roleRepository.findAllById(List.of(1L))).thenReturn(List.of(Role.builder().id(1L).name("R").build()));
-        assertEquals(1, roleService.getRoleSummariesByIds(List.of(1L)).size());
+        List<RoleResponse> ok = roleService.getRoleSummariesByIds(List.of(1L));
+        assertEquals(1, ok.size());
+        assertEquals("R", ok.get(0).getName());
 
         when(roleRepository.findAllById(List.of(99L))).thenReturn(List.of());
         assertTrue(roleService.getRoleSummariesByIds(List.of(99L)).isEmpty());

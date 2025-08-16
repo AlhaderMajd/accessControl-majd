@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class JwtTokenProviderTest {
 
     private JwtTokenProvider provider;
-    private static final String SECRET = "0123456789abcdef0123456789abcdef";
+    private static final String SECRET = "0123456789abcdef0123456789abcdef0123456789abcdef";
 
     @BeforeEach
     void setUp() throws Exception {
@@ -42,7 +42,7 @@ class JwtTokenProviderTest {
         JwtTokenProvider other = new JwtTokenProvider();
         Field secretField = JwtTokenProvider.class.getDeclaredField("secret");
         secretField.setAccessible(true);
-        secretField.set(other, "ffffffffffffffffffffffffffffffff");
+        secretField.set(other, "ffffffffffffffffffffffffffffffffffffffffffffffffffff");
         other.init();
 
         String tokenFromOther = other.generateToken("user@example.com");

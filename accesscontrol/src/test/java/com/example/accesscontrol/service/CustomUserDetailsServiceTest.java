@@ -9,6 +9,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
 import java.util.List;
 
@@ -37,9 +38,15 @@ class CustomUserDetailsServiceTest {
         assertTrue(details.isAccountNonLocked());
         assertTrue(details.isCredentialsNonExpired());
         assertTrue(details.isEnabled());
+
         List<String> auths = details.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList();
         assertTrue(auths.contains("ROLE_ADMIN"));
         assertTrue(auths.contains("ROLE_USER"));
+        assertEquals(2, auths.size());
+
+        verify(userService).getByEmailOrThrow("john@example.com");
+        verify(userRoleService).getRoleNamesByUserId(5L);
+        verifyNoMoreInteractions(userService, userRoleService);
     }
 
     @Test
@@ -51,11 +58,27 @@ class CustomUserDetailsServiceTest {
         UserDetails details = customUserDetailsService.loadUserByUsername("a@b.c");
 
         assertFalse(details.isEnabled());
+        assertTrue(details.getAuthorities().isEmpty());
+
+        verify(userService).getByEmailOrThrow("a@b.c");
+        verify(userRoleService).getRoleNamesByUserId(2L);
+        verifyNoMoreInteractions(userService, userRoleService);
     }
 
     @Test
-    void loadUserByUsername_userNotFound_propagatesException() {
-        when(userService.getByEmailOrThrow("x@y.z")).thenThrow(new UserNotFoundException("not found"));
-        assertThrows(RuntimeException.class, () -> customUserDetailsService.loadUserByUsername("x@y.z"));
+    void loadUserByUsername_userNotFound_throwsUsernameNotFoundException() {
+        when(userService.getByEmailOrThrow("x@y.z")).thenThrow(new UserNotFoundException("x@y.z"));
+
+        UsernameNotFoundException ex = assertThrows(
+                UsernameNotFoundException.class,
+                () -> customUserDetailsService.loadUserByUsername("x@y.z")
+        );
+
+        assertTrue(ex.getMessage() != null && ex.getMessage().contains("x@y.z"));
+
+        verify(userService).getByEmailOrThrow("x@y.z");
+        verifyNoInteractions(userRoleService);
+        verifyNoMoreInteractions(userService);
     }
+
 }

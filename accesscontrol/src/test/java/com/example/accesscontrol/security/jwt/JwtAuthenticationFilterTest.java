@@ -42,7 +42,6 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void doFilter_validToken_setsAuthenticationAndContinuesChain() throws ServletException, IOException {
-        // Arrange
         String token = "valid.jwt.token";
         String email = "user@example.com";
         MockHttpServletRequest request = new MockHttpServletRequest();
@@ -58,9 +57,9 @@ class JwtAuthenticationFilterTest {
         filter.doFilter(request, response, chain);
 
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        assertNotNull(auth, "Authentication should be set in SecurityContext");
-        assertEquals(user, auth.getPrincipal(), "Principal must be the loaded UserDetails");
-        assertTrue(auth.isAuthenticated(), "Authentication should be marked as authenticated");
+        assertNotNull(auth);
+        assertEquals(user, auth.getPrincipal());
+        assertTrue(auth.isAuthenticated());
         assertTrue(auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_USER")));
 
         verify(jwtTokenProvider).validateToken(token);
@@ -76,8 +75,7 @@ class JwtAuthenticationFilterTest {
 
         filter.doFilter(request, response, chain);
 
-        assertNull(SecurityContextHolder.getContext().getAuthentication(),
-                "Authentication must remain null when no token provided");
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
         verifyNoInteractions(jwtTokenProvider, userDetailsService);
     }
 
@@ -94,8 +92,7 @@ class JwtAuthenticationFilterTest {
 
         filter.doFilter(request, response, chain);
 
-        assertNull(SecurityContextHolder.getContext().getAuthentication(),
-                "Authentication must remain null when exception occurs");
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
         verify(jwtTokenProvider).validateToken(token);
         verify(jwtTokenProvider).getEmailFromToken(token);
         verifyNoInteractions(userDetailsService);
@@ -104,14 +101,13 @@ class JwtAuthenticationFilterTest {
     @Test
     void doFilter_nonBearerAuthorizationHeader_ignored_noValidateCall() throws ServletException, IOException {
         MockHttpServletRequest request = new MockHttpServletRequest();
-        request.addHeader("Authorization", "Token abc.def.ghi"); // not starting with "Bearer "
+        request.addHeader("Authorization", "Token abc.def.ghi");
         MockHttpServletResponse response = new MockHttpServletResponse();
         MockFilterChain chain = new MockFilterChain();
 
         filter.doFilter(request, response, chain);
 
-        assertNull(SecurityContextHolder.getContext().getAuthentication(),
-                "Authentication must remain null when header does not start with 'Bearer '");
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
         verifyNoInteractions(jwtTokenProvider, userDetailsService);
     }
 
@@ -124,11 +120,10 @@ class JwtAuthenticationFilterTest {
 
         filter.doFilter(request, response, chain);
 
-        assertNull(SecurityContextHolder.getContext().getAuthentication(),
-                "Authentication must remain null when header is blank");
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
         verifyNoInteractions(jwtTokenProvider, userDetailsService);
     }
-    
+
     @Test
     void doFilter_tokenPresent_butValidateFalse_noAuth_noFurtherCalls() throws ServletException, IOException {
         String token = "invalid.jwt.token";
@@ -141,8 +136,7 @@ class JwtAuthenticationFilterTest {
 
         filter.doFilter(request, response, chain);
 
-        assertNull(SecurityContextHolder.getContext().getAuthentication(),
-                "Authentication must remain null when token validation fails");
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
         verify(jwtTokenProvider).validateToken(token);
         verify(jwtTokenProvider, never()).getEmailFromToken(anyString());
         verifyNoInteractions(userDetailsService);
@@ -160,8 +154,7 @@ class JwtAuthenticationFilterTest {
 
         filter.doFilter(request, response, chain);
 
-        assertNull(SecurityContextHolder.getContext().getAuthentication(),
-                "Authentication must remain null when validateToken throws");
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
         verify(jwtTokenProvider).validateToken(token);
         verify(jwtTokenProvider, never()).getEmailFromToken(anyString());
         verifyNoInteractions(userDetailsService);
@@ -176,8 +169,7 @@ class JwtAuthenticationFilterTest {
 
         filter.doFilter(request, response, chain);
 
-        assertNull(SecurityContextHolder.getContext().getAuthentication(),
-                "Authentication must remain null when token is empty after Bearer prefix");
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
         verifyNoInteractions(jwtTokenProvider, userDetailsService);
     }
 }
