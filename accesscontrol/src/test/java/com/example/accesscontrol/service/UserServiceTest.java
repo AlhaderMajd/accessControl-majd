@@ -58,8 +58,6 @@ class UserServiceTest {
     @Mock private RoleService roleService;
 
     @Mock private EntityManager em;
-
-    // NOTE: JPQL now returns UserSummaryResponse directly
     @Mock private TypedQuery<UserSummaryResponse> dataQuery;
     @Mock private TypedQuery<Long> countQuery;
 
@@ -75,7 +73,6 @@ class UserServiceTest {
         SecurityContextHolder.clearContext();
     }
 
-    // --- helpers to mock auth ---
     private void mockAuthenticated(String email) {
         SecurityContext sc = mock(SecurityContext.class);
         Authentication auth = mock(Authentication.class);
@@ -83,6 +80,7 @@ class UserServiceTest {
         when(sc.getAuthentication()).thenReturn(auth);
         SecurityContextHolder.setContext(sc);
     }
+
     private void mockAuthenticatedNameNull() {
         SecurityContext sc = mock(SecurityContext.class);
         Authentication auth = mock(Authentication.class);
@@ -94,7 +92,7 @@ class UserServiceTest {
     // ---------------- createUsers ----------------
 
     @Test
-    void createUsers_success_assignsDefaultMemberRole() {
+    void createUsers_success_assignsMemberRole() {
         CreateUserRequest u1 = new CreateUserRequest();
         u1.setEmail("a@b.com");
         u1.setPassword("secret1");
@@ -105,10 +103,8 @@ class UserServiceTest {
 
         when(userRepository.findAllByEmailIn(List.of("a@b.com"))).thenReturn(List.of());
         when(passwordEncoder.encode("secret1")).thenReturn("enc");
-
         when(userRepository.saveAll(anyList())).thenAnswer(inv -> {
-            @SuppressWarnings("unchecked")
-            List<User> list = (List<User>) inv.getArgument(0);
+            @SuppressWarnings("unchecked") List<User> list = (List<User>) inv.getArgument(0);
             list.forEach(u -> u.setId(10L));
             return list;
         });
@@ -124,18 +120,15 @@ class UserServiceTest {
     }
 
     @Test
-    void createUsers_throwsOnNullOrEmpty_orInvalidInputs_orDuplicateEmails() {
-        // null users
-        CreateUsersRequest r1 = new CreateUsersRequest();
+    void createUsers_invalidInputs_orDuplicates_throw() {
+        CreateUsersRequest r1 = new CreateUsersRequest(); // null list
         r1.setUsers(null);
         assertThrows(IllegalArgumentException.class, () -> userService.createUsers(r1));
 
-        // empty users
-        CreateUsersRequest r2 = new CreateUsersRequest();
+        CreateUsersRequest r2 = new CreateUsersRequest(); // empty
         r2.setUsers(List.of());
         assertThrows(IllegalArgumentException.class, () -> userService.createUsers(r2));
 
-        // invalid email
         CreateUserRequest badEmail = new CreateUserRequest();
         badEmail.setEmail("not-email");
         badEmail.setPassword("123456");
@@ -143,7 +136,6 @@ class UserServiceTest {
         r3.setUsers(List.of(badEmail));
         assertThrows(IllegalArgumentException.class, () -> userService.createUsers(r3));
 
-        // invalid password
         CreateUserRequest badPwd = new CreateUserRequest();
         badPwd.setEmail("ok@x.com");
         badPwd.setPassword("123");
@@ -151,7 +143,6 @@ class UserServiceTest {
         r4.setUsers(List.of(badPwd));
         assertThrows(IllegalArgumentException.class, () -> userService.createUsers(r4));
 
-        // duplicate emails existing in DB
         CreateUserRequest ok = new CreateUserRequest();
         ok.setEmail("a@b.com");
         ok.setPassword("123456");
@@ -162,7 +153,7 @@ class UserServiceTest {
         assertThrows(EmailAlreadyUsedException.class, () -> userService.createUsers(r5));
     }
 
-    // ---------------- getUsers (JPQL to DTO) ----------------
+    // ---------------- getUsers (JPQL -> DTO) ----------------
 
     @Test
     void getUsers_paged_success() {
@@ -207,7 +198,7 @@ class UserServiceTest {
     // ---------------- getUserDetails ----------------
 
     @Test
-    void getUserDetails_validatesAndReturns() {
+    void getUserDetails_validates_and_returns() {
         assertThrows(IllegalArgumentException.class, () -> userService.getUserDetails(0L));
         assertThrows(IllegalArgumentException.class, () -> userService.getUserDetails(null));
 
@@ -244,22 +235,18 @@ class UserServiceTest {
 
     @Test
     void changePassword_invalidCases() {
-        // invalid new password length
         mockAuthenticated("me@x.com");
         assertThrows(IllegalArgumentException.class,
                 () -> userService.changePassword(new ChangePasswordRequest("old", "123")));
 
-        // unauthenticated
         SecurityContextHolder.clearContext();
         assertThrows(InvalidCredentialsException.class,
                 () -> userService.changePassword(new ChangePasswordRequest("old", "123456")));
 
-        // name null
         mockAuthenticatedNameNull();
         assertThrows(InvalidCredentialsException.class,
                 () -> userService.changePassword(new ChangePasswordRequest("old", "123456")));
 
-        // wrong old password
         mockAuthenticated("u@a.com");
         when(userRepository.findByEmail("u@a.com"))
                 .thenReturn(Optional.of(User.builder().id(1L).email("u@a.com").password("h").build()));
@@ -267,12 +254,11 @@ class UserServiceTest {
         assertThrows(InvalidCredentialsException.class,
                 () -> userService.changePassword(new ChangePasswordRequest("old", "123456")));
 
-        // new equals current hash (service also blocks this)
         mockAuthenticated("same@x.com");
         when(userRepository.findByEmail("same@x.com"))
                 .thenReturn(Optional.of(User.builder().id(2L).email("same@x.com").password("hash").build()));
         when(passwordEncoder.matches("old", "hash")).thenReturn(true);
-        when(passwordEncoder.matches("newPass", "hash")).thenReturn(true); // equals current
+        when(passwordEncoder.matches("newPass", "hash")).thenReturn(true); // equals current hash
         assertThrows(IllegalArgumentException.class,
                 () -> userService.changePassword(new ChangePasswordRequest("old", "newPass")));
     }
@@ -292,30 +278,26 @@ class UserServiceTest {
     }
 
     @Test
-    void changeEmail_invalid_or_taken_or_sameIgnoringCase_or_unauthenticated() {
+    void changeEmail_invalid_taken_sameIgnoringCase_or_unauthenticated() {
         mockAuthenticated("me@x.com");
         User me = User.builder().id(1L).email("me@x.com").build();
         when(userRepository.findByEmail("me@x.com")).thenReturn(Optional.of(me));
 
-        // invalid format
         assertThrows(IllegalArgumentException.class,
                 () -> userService.changeEmail(new UpdateEmailRequest("bad")));
 
-        // same ignoring case -> now INVALID (service rejects)
+        // same email ignoring case -> service throws IllegalArgumentException
         assertThrows(IllegalArgumentException.class,
                 () -> userService.changeEmail(new UpdateEmailRequest("ME@X.COM")));
 
-        // taken
         when(userRepository.existsByEmailIgnoreCase("dup@x.com")).thenReturn(true);
         assertThrows(EmailAlreadyUsedException.class,
                 () -> userService.changeEmail(new UpdateEmailRequest("dup@x.com")));
 
-        // unauthenticated
         SecurityContextHolder.clearContext();
         assertThrows(InvalidCredentialsException.class,
                 () -> userService.changeEmail(new UpdateEmailRequest("ok@x.com")));
 
-        // name null
         mockAuthenticatedNameNull();
         assertThrows(InvalidCredentialsException.class,
                 () -> userService.changeEmail(new UpdateEmailRequest("ok2@x.com")));
@@ -340,16 +322,15 @@ class UserServiceTest {
         assertEquals("User status updated successfully", resp.getMessage());
         assertEquals(2, resp.getUpdatedCount());
 
-        // invalids
-        UpdateUserStatusRequest badEmptyIds = new UpdateUserStatusRequest();
-        badEmptyIds.setUserIds(List.of());
-        badEmptyIds.setEnabled(true);
-        assertThrows(IllegalArgumentException.class, () -> userService.updateUserStatus(badEmptyIds));
+        UpdateUserStatusRequest emptyIds = new UpdateUserStatusRequest();
+        emptyIds.setUserIds(List.of());
+        emptyIds.setEnabled(true);
+        assertThrows(IllegalArgumentException.class, () -> userService.updateUserStatus(emptyIds));
 
-        UpdateUserStatusRequest badNullIds = new UpdateUserStatusRequest();
-        badNullIds.setUserIds(null);
-        badNullIds.setEnabled(true);
-        assertThrows(IllegalArgumentException.class, () -> userService.updateUserStatus(badNullIds));
+        UpdateUserStatusRequest nullIds = new UpdateUserStatusRequest();
+        nullIds.setUserIds(null);
+        nullIds.setEnabled(true);
+        assertThrows(IllegalArgumentException.class, () -> userService.updateUserStatus(nullIds));
 
         UpdateUserStatusRequest enabledNull = new UpdateUserStatusRequest();
         enabledNull.setUserIds(List.of(1L));
@@ -380,7 +361,6 @@ class UserServiceTest {
         AssignRolesResponse resp = userService.assignRolesToUsers(req);
         assertEquals(1, resp.getAssignedCount());
 
-        // invalid
         AssignRolesRequest emptyUsers = new AssignRolesRequest();
         emptyUsers.setUserIds(List.of());
         emptyUsers.setRoleIds(List.of(2L));
@@ -426,7 +406,6 @@ class UserServiceTest {
         AssignUsersToGroupsRequest req = new AssignUsersToGroupsRequest();
         when(userGroupService.assignUsersToGroups(req))
                 .thenReturn(AssignUsersToGroupsResponse.builder().assignedCount(2).build());
-
         AssignUsersToGroupsResponse resp = userService.assignUsersToGroups(req);
         assertEquals(2, resp.getAssignedCount());
     }
@@ -453,7 +432,6 @@ class UserServiceTest {
         emptyGroups.setGroupIds(List.of());
         assertThrows(IllegalArgumentException.class, () -> userService.deassignUsersFromGroups(emptyGroups));
 
-        // success
         DeassignUsersFromGroupsRequest ok = new DeassignUsersFromGroupsRequest();
         ok.setUserIds(List.of(1L));
         ok.setGroupIds(List.of(2L));
@@ -472,7 +450,6 @@ class UserServiceTest {
     void deleteUsers_success_and_errors() {
         DeleteUsersRequest req = new DeleteUsersRequest();
         req.setUserIds(List.of(1L, 2L));
-
         when(userRepository.findAllById(List.of(1L, 2L)))
                 .thenReturn(List.of(User.builder().id(1L).build(), User.builder().id(2L).build()));
 
@@ -482,19 +459,17 @@ class UserServiceTest {
         verify(userGroupService).deleteByUserIds(List.of(1L, 2L));
         verify(userRepository).deleteAllByIdInBatch(List.of(1L, 2L));
 
-        // invalid ids list
         DeleteUsersRequest bad = new DeleteUsersRequest();
         bad.setUserIds(List.of());
         assertThrows(IllegalArgumentException.class, () -> userService.deleteUsers(bad));
 
-        // not found
         DeleteUsersRequest notFound = new DeleteUsersRequest();
         notFound.setUserIds(List.of(9L));
         when(userRepository.findAllById(List.of(9L))).thenReturn(List.of());
         assertThrows(ResourceNotFoundException.class, () -> userService.deleteUsers(notFound));
     }
 
-    // ---------------- misc helpers ----------------
+    // ---------------- helpers ----------------
 
     @Test
     void helpers_getByIdsOrThrow_emailExists_save_getExistingIds_getUserSummariesByIds_getByEmailOrThrow() {
