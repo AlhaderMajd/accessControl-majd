@@ -10,9 +10,6 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class AssignRolesRequest {
-    @NotEmpty
-    private List<@NotNull Long> userIds;
-
-    @NotEmpty
-    private List<@NotNull Long> roleIds;
+    private List<Long> userIds;
+    private List<Long> roleIds;
 }

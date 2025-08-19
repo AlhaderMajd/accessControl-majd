@@ -8,9 +8,6 @@ import java.util.List;
 
 @Data
 public class CreateRoleRequest {
-    @NotBlank
-    @Size(max = 100)
     private String name;
-
     private List<Long> permissionIds;
 }

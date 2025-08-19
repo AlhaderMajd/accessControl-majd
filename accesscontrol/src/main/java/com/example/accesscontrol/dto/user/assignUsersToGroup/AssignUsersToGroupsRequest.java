@@ -8,9 +8,6 @@ import java.util.List;
 
 @Data
 public class AssignUsersToGroupsRequest {
-    @NotEmpty
-    private List<@NotNull Long> userIds;
-
-    @NotEmpty
-    private List<@NotNull Long> groupIds;
+    private List<Long> userIds;
+    private List<Long> groupIds;
 }

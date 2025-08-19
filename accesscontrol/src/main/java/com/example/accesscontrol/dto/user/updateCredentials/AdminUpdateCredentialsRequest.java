@@ -6,10 +6,6 @@ import lombok.Data;
 
 @Data
 public class AdminUpdateCredentialsRequest {
-    @Email
-    @Size(max = 150)
     private String email;
-
-    @Size(min = 6, max = 255)
     private String password;
 }

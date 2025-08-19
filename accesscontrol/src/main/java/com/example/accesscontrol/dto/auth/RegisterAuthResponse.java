@@ -8,8 +8,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class AuthResponse {
-    private String token;
+public class RegisterAuthResponse {
     private Long userId;
     private List<String> roles;
 }

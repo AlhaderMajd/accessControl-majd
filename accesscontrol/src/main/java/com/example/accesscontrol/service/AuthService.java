@@ -1,7 +1,9 @@
 package com.example.accesscontrol.service;
 
+import com.example.accesscontrol.config.logs;
 import com.example.accesscontrol.dto.auth.AuthRequest;
-import com.example.accesscontrol.dto.auth.AuthResponse;
+import com.example.accesscontrol.dto.auth.LoginAuthResponse;
+import com.example.accesscontrol.dto.auth.RegisterAuthResponse;
 import com.example.accesscontrol.entity.Role;
 import com.example.accesscontrol.entity.User;
 import com.example.accesscontrol.exception.EmailAlreadyUsedException;
@@ -12,16 +14,25 @@ import com.example.accesscontrol.security.jwt.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
+
+    private static final String INVALID_CREDENTIALS_MSG = "Invalid email or password";
+    private static final String DUMMY_BCRYPT =
+            "$2a$10$7EqJtq98hPqEX7fNZaFWoOhiD7HkGKuGJySLjeRGna43EIBgzHuMG";
+
+    private static final Pattern EMAIL_PATTERN = Pattern.compile(
+            "^[A-Za-z0-9._%+-]+@(?:[A-Za-z0-9-]+\\.)+[A-Za-z]{2,24}$"
+    );
 
     private final UserService userService;
     private final UserRoleService userRoleService;
@@ -29,64 +40,61 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
 
-    @Transactional(readOnly = true)
-    public AuthResponse login(AuthRequest request) {
-        final String email = request.getEmail() == null ? null : request.getEmail().trim();
+    private final logs logs;
 
-        if (email == null || request.getPassword() == null || !isValidEmail(email)) {
-            auditLoginFailure(email, "invalid_format");
-            throw new InvalidCredentialsException("Invalid email or password");
+    @Transactional(readOnly = true)
+    public LoginAuthResponse login(AuthRequest request) {
+        final String email = request.getEmail() == null ? null : request.getEmail().strip();
+        final String password = request.getPassword();
+
+        if (isInvalidPassword(password) || isInvalidEmail(email)) {
+            throw deny(email, "invalid_format"); //401
         }
 
-        User user;
+        final User user;
         try {
             user = userService.getByEmailOrThrow(email);
         } catch (UserNotFoundException ex) {
-            passwordEncoder.matches("dummy-password",
-                    "$2a$10$7EqJtq98hPqEX7fNZaFWoOhiD7HkGKuGJySLjeRGna43EIBgzHuMG");
-            auditLoginFailure(email, "not_found");
-            throw new InvalidCredentialsException("Invalid email or password");
+            passwordEncoder.matches("dummy-password", DUMMY_BCRYPT);
+            throw deny(email, "not_found"); //401
         }
 
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            auditLoginFailure(email, "bad_password");
-            throw new InvalidCredentialsException("Invalid email or password");
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            throw deny(email, "bad_password"); //401
         }
 
         if (!user.isEnabled()) {
             auditLoginFailure(email, "disabled");
-            throw new UserDisabledException();
+            throw new UserDisabledException(); //403
         }
 
-        List<String> roles = userRoleService.getRoleNamesByUserId(user.getId());
-        if (roles.isEmpty()) {
-            auditLoginFailure(email, "no_roles");
-            throw new InvalidCredentialsException("Invalid email or password");
+        final List<String> roles = userRoleService.getRoleNamesByUserId(user.getId());
+        if (roles == null || roles.isEmpty()) {
+            throw deny(email, "no_roles"); //401
         }
 
-        String token = jwtTokenProvider.generateToken(user.getEmail());
+        final String token = jwtTokenProvider.generateToken(user.getEmail());
         auditLoginSuccess(user.getId(), email);
 
-        return AuthResponse.builder()
+        return LoginAuthResponse.builder()
                 .token(token)
                 .userId(user.getId())
                 .roles(roles)
-                .build();
+                .build(); //200
     }
 
     @Transactional
-    public AuthResponse register(AuthRequest request) {
-        final String email = request.getEmail() == null ? null : request.getEmail().trim();
+    public RegisterAuthResponse register(AuthRequest request) {
+        final String email = request.getEmail() == null ? null : request.getEmail().strip();
         final String rawPassword = request.getPassword();
 
-        if (email == null || rawPassword == null || !isValidEmail(email) || !isValidPassword(rawPassword)) {
-            auditRegisterFailure(email, "invalid_format");
-            throw new InvalidCredentialsException("Invalid email or password format");
+        if (isInvalidEmail(email) || isInvalidPassword(rawPassword)) {
+            throw deny(email, "invalid_format"); //401
         }
 
         if (userService.emailExists(email)) {
             auditRegisterFailure(email, "email_in_use_precheck");
-            throw new EmailAlreadyUsedException("Email already in use");
+            throw new EmailAlreadyUsedException("Email already in use"); //409
         }
 
         try {
@@ -103,48 +111,43 @@ public class AuthService {
 
             auditRegisterSuccess(saved.getId(), email);
 
-            return AuthResponse.builder()
-                    .token(null)
+            return RegisterAuthResponse.builder()
                     .userId(saved.getId())
                     .roles(List.of(member.getName()))
-                    .build();
+                    .build(); //201
 
         } catch (DataIntegrityViolationException ex) {
             auditRegisterFailure(email, "email_in_use_violation");
-            throw new EmailAlreadyUsedException("Email already in use");
+            throw new EmailAlreadyUsedException("Email already in use"); //409
         }
     }
 
+    private InvalidCredentialsException deny(String email, String reason) {
+        auditLoginFailure(email, reason);
+        return new InvalidCredentialsException(INVALID_CREDENTIALS_MSG);
+    }
+
+    private boolean isInvalidEmail(String email) {
+        return email == null || email.isBlank() || !EMAIL_PATTERN.matcher(email).matches();
+    }
+
+    private boolean isInvalidPassword(String password) {
+        return password == null || password.length() < 6;
+    }
+
     private void auditLoginFailure(String email, String reason) {
-        log.info("auth.login.failed email={} reason={}", mask(email), reason);
+        log.info("auth.login.failed email={} reason={}", logs.mask(email), reason);
     }
 
     private void auditLoginSuccess(Long userId, String email) {
-        log.info("auth.login.success userId={} email={}", userId, mask(email));
+        log.info("auth.login.success userId={} email={}", userId, logs.mask(email));
     }
 
     private void auditRegisterSuccess(Long userId, String email) {
-        log.info("auth.register.success userId={} email={}", userId, mask(email));
+        log.info("auth.register.success userId={} email={}", userId, logs.mask(email));
     }
 
     private void auditRegisterFailure(String email, String reason) {
-        log.info("auth.register.failed email={} reason={}", mask(email), reason);
-    }
-
-    private boolean isValidEmail(String email) {
-        return email != null && email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$");
-    }
-
-    private boolean isValidPassword(String password) {
-        return password != null && password.length() >= 6;
-    }
-
-    private String mask(String email) {
-        if (email == null || email.isBlank() || !email.contains("@")) return "unknown";
-        String[] parts = email.split("@", 2);
-        String local = parts[0];
-        String domain = parts[1];
-        String head = local.isEmpty() ? "*" : local.substring(0, 1);
-        return head + "***@" + domain;
+        log.info("auth.register.failed email={} reason={}", logs.mask(email), reason);
     }
 }

@@ -11,6 +11,5 @@ import java.util.List;
 @AllArgsConstructor
 @Builder
 public class CreateUsersRequest {
-    @NotEmpty
-    private List<@Valid CreateUserRequest> users;
+    private List<CreateUserRequest> users;
 }

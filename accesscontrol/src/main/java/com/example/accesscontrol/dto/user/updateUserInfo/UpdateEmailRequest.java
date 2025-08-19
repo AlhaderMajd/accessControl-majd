@@ -9,8 +9,5 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 public class UpdateEmailRequest {
-    @Email
-    @NotBlank
-    @Size(max = 150)
     private String newEmail;
 }

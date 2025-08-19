@@ -8,9 +8,6 @@ import java.util.List;
 
 @Data
 public class AssignPermissionsToRolesRequest {
-    @NotNull
     private Long roleId;
-
-    @NotEmpty
-    private List<@NotNull Long> permissionIds;
+    private List<Long> permissionIds;
 }

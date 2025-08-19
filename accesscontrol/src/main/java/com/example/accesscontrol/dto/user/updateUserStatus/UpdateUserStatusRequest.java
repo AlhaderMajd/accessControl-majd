@@ -10,9 +10,6 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class UpdateUserStatusRequest {
-    @NotEmpty
-    private List<@NotNull Long> userIds;
-
-    @NotNull
+    private List<Long> userIds;
     private Boolean enabled;
 }

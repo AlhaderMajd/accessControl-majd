@@ -1,7 +1,7 @@
 package com.example.accesscontrol.dto;
 
 import com.example.accesscontrol.dto.auth.AuthRequest;
-import com.example.accesscontrol.dto.auth.AuthResponse;
+import com.example.accesscontrol.dto.auth.LoginAuthResponse;
 import com.example.accesscontrol.dto.common.MessageResponse;
 import com.example.accesscontrol.dto.role.CreateRoleRequest;
 import com.example.accesscontrol.dto.permission.UpdatePermissionNameRequest;
@@ -129,7 +129,7 @@ public class DtoValidationAndJsonTest {
 
     @Test
     void authResponse_json_serialization_and_deserialization() throws Exception {
-        AuthResponse resp = AuthResponse.builder()
+        LoginAuthResponse resp = LoginAuthResponse.builder()
                 .token("T")
                 .userId(42L)
                 .roles(List.of("ADMIN", "USER"))
@@ -142,7 +142,7 @@ public class DtoValidationAndJsonTest {
         assertTrue(asMap.containsKey("roles"));
         assertEquals("42", asMap.get("userId").toString());
 
-        AuthResponse back = mapper.readValue(json, AuthResponse.class);
+        LoginAuthResponse back = mapper.readValue(json, LoginAuthResponse.class);
         assertEquals(resp, back);
     }
 

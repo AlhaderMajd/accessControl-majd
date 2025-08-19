@@ -18,9 +18,6 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    // --- Validation ---
-
-    // For @Valid on @RequestBody objects (e.g., bad JSON fields)
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleMethodArgumentNotValid(MethodArgumentNotValidException ex) {
         String message = ex.getBindingResult()
@@ -32,26 +29,20 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.BAD_REQUEST, message);
     }
 
-    // For @Validated method params & path variables (e.g., @Min/@Max on page, size, groupId)
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<Map<String, Object>> handleConstraintViolation(ConstraintViolationException ex) {
         return buildResponse(HttpStatus.BAD_REQUEST, "Validation failed");
     }
 
-    // Missing or unreadable request body (e.g., POST/PUT without JSON body)
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<Map<String, Object>> handleHttpMessageNotReadable(HttpMessageNotReadableException ex) {
         return buildResponse(HttpStatus.BAD_REQUEST, "Request body is missing or unreadable");
     }
 
-    // --- 404s used by Group tests ---
-
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleResourceNotFound(ResourceNotFoundException ex) {
         return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage());
     }
-
-    // --- Existing handlers you wanted to keep ---
 
     @ExceptionHandler(OptimisticLockException.class)
     public ResponseEntity<Map<String, Object>> handleOptimisticLock(OptimisticLockException ex) {
@@ -101,7 +92,6 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Something went wrong");
     }
 
-    // --- helper ---
     private ResponseEntity<Map<String, Object>> buildResponse(HttpStatus status, String message) {
         return ResponseEntity.status(status).body(
                 Map.of(
