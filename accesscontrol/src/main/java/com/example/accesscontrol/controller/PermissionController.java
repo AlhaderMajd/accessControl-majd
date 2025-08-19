@@ -1,7 +1,8 @@
 package com.example.accesscontrol.controller;
 
-import com.example.accesscontrol.dto.common.MessageResponse;
+import com.example.accesscontrol.config.logs;
 import com.example.accesscontrol.dto.common.PageResponse;
+import com.example.accesscontrol.dto.common.MessageResponse;
 import com.example.accesscontrol.dto.permission.*;
 import com.example.accesscontrol.service.PermissionService;
 import jakarta.validation.Valid;
@@ -25,16 +26,16 @@ import java.util.List;
 public class PermissionController {
 
     private final PermissionService permissionService;
+    private final logs logs;
 
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public CreatePermissionsResponse createPermissions(@Valid @RequestBody CreatePermissionsRequest request) {
         var auth = SecurityContextHolder.getContext().getAuthentication();
-        String actor = (auth == null) ? "unknown" : auth.getName();
+        String actor = auth == null ? "unknown" : auth.getName();
         int count = request == null || request.getPermissions() == null ? 0 : request.getPermissions().size();
-        log.info("permissions.create request actor={} count={}", mask(actor), count);
-
+        log.info("permissions.create request actor={} count={}", logs.mask(actor), count);
         return permissionService.createPermissions(request);
     }
 
@@ -46,10 +47,9 @@ public class PermissionController {
             @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size) {
 
         var auth = SecurityContextHolder.getContext().getAuthentication();
-        String actor = (auth == null) ? "unknown" : auth.getName();
+        String actor = auth == null ? "unknown" : auth.getName();
         log.info("permissions.list request actor={} page={} size={} q_len={}",
-                mask(actor), page, size, search == null ? 0 : search.length());
-
+                logs.mask(actor), page, size, search == null ? 0 : search.length());
         return permissionService.getPermissions(search, page, size);
     }
 
@@ -57,9 +57,8 @@ public class PermissionController {
     @GetMapping("/{permissionId}")
     public PermissionResponse getPermissionsDetails(@PathVariable @Min(1) Long permissionId) {
         var auth = SecurityContextHolder.getContext().getAuthentication();
-        String actor = (auth == null) ? "unknown" : auth.getName();
-        log.info("permissions.details request actor={} permissionId={}", mask(actor), permissionId);
-
+        String actor = auth == null ? "unknown" : auth.getName();
+        log.info("permissions.details request actor={} permissionId={}", logs.mask(actor), permissionId);
         return permissionService.getPermissionDetails(permissionId);
     }
 
@@ -70,10 +69,9 @@ public class PermissionController {
             @Valid @RequestBody UpdatePermissionNameRequest request) {
 
         var auth = SecurityContextHolder.getContext().getAuthentication();
-        String actor = (auth == null) ? "unknown" : auth.getName();
+        String actor = auth == null ? "unknown" : auth.getName();
         log.info("permissions.update_name request actor={} permissionId={} new_len={}",
-                mask(actor), permissionId, request.getName() == null ? 0 : request.getName().length());
-
+                logs.mask(actor), permissionId, request.getName() == null ? 0 : request.getName().length());
         return permissionService.updatePermissionName(permissionId, request);
     }
 
@@ -81,16 +79,9 @@ public class PermissionController {
     @DeleteMapping
     public MessageResponse deletePermissions(@RequestBody List<Long> permissionIds) {
         var auth = SecurityContextHolder.getContext().getAuthentication();
-        String actor = (auth == null) ? "unknown" : auth.getName();
-        log.info("permissions.delete request actor={} count={}",
-                mask(actor), permissionIds == null ? 0 : permissionIds.size());
-
+        String actor = auth == null ? "unknown" : auth.getName();
+        log.info("permissions.delete request actor={} count={}", logs.mask(actor),
+                permissionIds == null ? 0 : permissionIds.size());
         return permissionService.deletePermissions(permissionIds);
-    }
-
-    private String mask(String email) {
-        if (email == null || !email.contains("@")) return "unknown";
-        String[] p = email.split("@", 2);
-        return (p[0].isEmpty() ? "*" : p[0].substring(0,1)) + "***@" + p[1];
     }
 }

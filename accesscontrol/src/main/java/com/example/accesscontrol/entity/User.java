@@ -10,42 +10,49 @@ import java.util.Set;
 @Entity
 @Table(
         name = "users",
-        uniqueConstraints = @UniqueConstraint(name = "uk_users_email", columnNames = "email"),
         indexes = {
                 @Index(name = "idx_users_email", columnList = "email"),
                 @Index(name = "idx_users_enabled", columnList = "enabled")
         }
 )
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString(exclude = {"userRoles", "userGroups"})
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @EqualsAndHashCode.Include
     private Long id;
 
-    @Column(nullable = false, length = 150)
+    @Column(nullable = false, length = 150, unique = true)
     private String email;
 
     @Column(nullable = false, length = 255)
     private String password;
 
-    @Column(nullable = false)
     @Builder.Default
+    @Column(nullable = false)
     private boolean enabled = true;
 
     @Version
-    private long version;
+    private Long version;
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @Builder.Default
+    @ManyToMany
+    @JoinTable(name = "user_roles",
+            joinColumns = @JoinColumn(name = "user_id", nullable = false),
+            inverseJoinColumns = @JoinColumn(name = "role_id", nullable = false),
+            uniqueConstraints = @UniqueConstraint(name = "uk_user_roles_user_role", columnNames = {"user_id", "role_id"}))
     @BatchSize(size = 50)
-    private Set<UserRole> userRoles = new LinkedHashSet<>();
+    private Set<Role> roles = new LinkedHashSet<>();
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @Builder.Default
+    @ManyToMany
+    @JoinTable(name = "user_groups",
+            joinColumns = @JoinColumn(name = "user_id", nullable = false),
+            inverseJoinColumns = @JoinColumn(name = "group_id", nullable = false),
+            uniqueConstraints = @UniqueConstraint(name = "uk_user_groups_user_group", columnNames = {"user_id", "group_id"}))
     @BatchSize(size = 50)
-    private Set<UserGroup> userGroups = new LinkedHashSet<>();
+    private Set<Group> groups = new LinkedHashSet<>();
 }

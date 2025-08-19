@@ -1,104 +1,83 @@
 package com.example.accesscontrol.exception;
 
-import jakarta.persistence.OptimisticLockException;
-import jakarta.validation.ConstraintViolationException;
-import org.springframework.context.support.DefaultMessageSourceResolvable;
-import org.springframework.dao.DataAccessResourceFailureException;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.transaction.CannotCreateTransactionException;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, Object>> handleMethodArgumentNotValid(MethodArgumentNotValidException ex) {
-        String message = ex.getBindingResult()
-                .getAllErrors()
-                .stream()
-                .map(DefaultMessageSourceResolvable::getDefaultMessage)
-                .findFirst()
-                .orElse("Validation failed");
-        return buildResponse(HttpStatus.BAD_REQUEST, message);
+    private ResponseEntity<ApiError> build(HttpStatus status, String code, String message,
+                                           HttpServletRequest req, Map<String, String> details) {
+        return ResponseEntity.status(status).body(
+                ApiError.builder()
+                        .timestamp(Instant.now())
+                        .status(status.value())
+                        .error(code)
+                        .message(message)
+                        .path(req.getRequestURI())
+                        .details(details == null || details.isEmpty() ? null : details)
+                        .build()
+        );
     }
 
-    @ExceptionHandler(ConstraintViolationException.class)
-    public ResponseEntity<Map<String, Object>> handleConstraintViolation(ConstraintViolationException ex) {
-        return buildResponse(HttpStatus.BAD_REQUEST, "Validation failed");
-    }
-
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<Map<String, Object>> handleHttpMessageNotReadable(HttpMessageNotReadableException ex) {
-        return buildResponse(HttpStatus.BAD_REQUEST, "Request body is missing or unreadable");
-    }
-
-    @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<Map<String, Object>> handleResourceNotFound(ResourceNotFoundException ex) {
-        return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage());
-    }
-
-    @ExceptionHandler(OptimisticLockException.class)
-    public ResponseEntity<Map<String, Object>> handleOptimisticLock(OptimisticLockException ex) {
-        return buildResponse(HttpStatus.CONFLICT, "Update conflict. Please retry.");
-    }
-
-    @ExceptionHandler(UserNotFoundException.class)
-    public ResponseEntity<Map<String, Object>> handleUserNotFound(UserNotFoundException ex) {
-        return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage());
-    }
-
-    @ExceptionHandler(InvalidCredentialsException.class)
-    public ResponseEntity<Map<String, Object>> handleInvalidCredentials(InvalidCredentialsException ex) {
-        return buildResponse(HttpStatus.UNAUTHORIZED, ex.getMessage());
-    }
-
-    @ExceptionHandler(UserDisabledException.class)
-    public ResponseEntity<Map<String, Object>> handleUserDisabled(UserDisabledException ex) {
-        return buildResponse(HttpStatus.FORBIDDEN, ex.getMessage());
-    }
-
-    @ExceptionHandler({
-            CannotCreateTransactionException.class,
-            DataAccessResourceFailureException.class
-    })
-    public ResponseEntity<Map<String, Object>> handleDatabaseConnectionIssue(Exception ex) {
-        return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, "Database connection failed. Please try again later.");
+    private ResponseEntity<ApiError> build(HttpStatus status, String code, String message, HttpServletRequest req) {
+        return build(status, code, message, req, null);
     }
 
     @ExceptionHandler(EmailAlreadyUsedException.class)
-    public ResponseEntity<Map<String, Object>> handleEmailAlreadyUsed(EmailAlreadyUsedException ex) {
-        return buildResponse(HttpStatus.CONFLICT, ex.getMessage());
+    public ResponseEntity<ApiError> handleEmailInUse(EmailAlreadyUsedException ex, HttpServletRequest req) {
+        return build(HttpStatus.CONFLICT, "EMAIL_IN_USE", ex.getMessage(), req);
     }
 
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException ex) {
-        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
+    @ExceptionHandler(UserDisabledException.class)
+    public ResponseEntity<ApiError> handleDisabled(UserDisabledException ex, HttpServletRequest req) {
+        return build(HttpStatus.FORBIDDEN, "USER_DISABLED", ex.getMessage(), req);
+    }
+
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<ApiError> handleInvalidCreds(InvalidCredentialsException ex, HttpServletRequest req) {
+        return build(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", ex.getMessage(), req);
+    }
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ApiError> handleNotFound(ResourceNotFoundException ex, HttpServletRequest req) {
+        return build(HttpStatus.NOT_FOUND, "NOT_FOUND", ex.getMessage(), req);
     }
 
     @ExceptionHandler(DuplicateResourceException.class)
-    public ResponseEntity<Map<String, Object>> handleDuplicate(DuplicateResourceException ex) {
-        return buildResponse(HttpStatus.CONFLICT, ex.getMessage());
+    public ResponseEntity<ApiError> handleDuplicate(DuplicateResourceException ex, HttpServletRequest req) {
+        return build(HttpStatus.CONFLICT, "DUPLICATE_RESOURCE", ex.getMessage(), req);
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ApiError> handleValidation(MethodArgumentNotValidException ex, HttpServletRequest req) {
+        Map<String, String> details = new LinkedHashMap<>();
+        for (FieldError fe : ex.getBindingResult().getFieldErrors()) {
+            details.putIfAbsent(fe.getField(), fe.getDefaultMessage());
+        }
+        return build(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Request validation failed", req, details);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiError> handleConstraint(DataIntegrityViolationException ex, HttpServletRequest req) {
+        log.warn("constraint violation: {}", ex.getMostSpecificCause() == null ? ex.getMessage() : ex.getMostSpecificCause().getMessage());
+        return build(HttpStatus.CONFLICT, "CONSTRAINT_VIOLATION", "Data constraint violation", req);
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, Object>> handleOtherExceptions(Exception ex) {
-        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Something went wrong");
-    }
-
-    private ResponseEntity<Map<String, Object>> buildResponse(HttpStatus status, String message) {
-        return ResponseEntity.status(status).body(
-                Map.of(
-                        "timestamp", LocalDateTime.now().toString(),
-                        "error", message,
-                        "status", status.value()
-                )
-        );
+    public ResponseEntity<ApiError> handleAny(Exception ex, HttpServletRequest req) {
+        log.error("unhandled exception at {}: {}", req.getRequestURI(), ex.toString(), ex);
+        return build(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "Something went wrong", req);
     }
 }

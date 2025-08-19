@@ -1,5 +1,6 @@
 package com.example.accesscontrol.service;
 
+import com.example.accesscontrol.entity.Role;
 import com.example.accesscontrol.entity.User;
 import com.example.accesscontrol.exception.UserNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -15,19 +16,18 @@ import java.util.List;
 public class CustomUserDetailsService implements UserDetailsService {
 
     private final UserService userService;
-    private final UserRoleService userRoleService;
 
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         final User u;
         try {
-            u = userService.getByEmailOrThrow(email);
+            u = userService.getWithRolesByEmailOrThrow(email);
         } catch (UserNotFoundException ex) {
             throw new UsernameNotFoundException(ex.getMessage(), ex);
         }
 
-        List<String> roleNames = userRoleService.getRoleNamesByUserId(u.getId());
-        List<GrantedAuthority> authorities = roleNames.stream()
+        List<GrantedAuthority> authorities = u.getRoles().stream()
+                .map(Role::getName)
                 .map(r -> (GrantedAuthority) new SimpleGrantedAuthority("ROLE_" + r))
                 .toList();
 

@@ -4,6 +4,7 @@ import com.example.accesscontrol.dto.common.MessageResponse;
 import com.example.accesscontrol.dto.common.PageResponse;
 import com.example.accesscontrol.dto.permission.*;
 import com.example.accesscontrol.entity.Permission;
+import com.example.accesscontrol.entity.Role;
 import com.example.accesscontrol.exception.DuplicateResourceException;
 import com.example.accesscontrol.exception.ResourceNotFoundException;
 import com.example.accesscontrol.repository.PermissionRepository;
@@ -22,7 +23,6 @@ import java.util.*;
 public class PermissionService {
 
     private final PermissionRepository permissionRepository;
-    private final RolePermissionService rolePermissionService;
 
     @Transactional
     public CreatePermissionsResponse createPermissions(CreatePermissionsRequest request) {
@@ -45,16 +45,14 @@ public class PermissionService {
                 .map(Map.Entry::getKey)
                 .toList();
         if (!dupPayload.isEmpty()) {
-            throw new com.example.accesscontrol.exception.DuplicateResourceException(
-                    "Duplicate permission names in request: " + dupPayload);
+            throw new DuplicateResourceException("Duplicate permission names in request: " + dupPayload);
         }
 
-        Set<String> existing = permissionRepository.findByNameInIgnoreCase(names).stream()
-                .map(Permission::getName)
-                .collect(java.util.stream.Collectors.toSet());
+        Set<String> existing = permissionRepository
+                .findByNameInIgnoreCase(names.stream().map(s -> s.toLowerCase(Locale.ROOT)).toList())
+                .stream().map(Permission::getName).collect(java.util.stream.Collectors.toSet());
         if (!existing.isEmpty()) {
-            throw new com.example.accesscontrol.exception.DuplicateResourceException(
-                    "Permissions already exist: " + existing);
+            throw new DuplicateResourceException("Permissions already exist: " + existing);
         }
 
         List<Permission> saved;
@@ -63,14 +61,13 @@ public class PermissionService {
                     names.stream().map(n -> Permission.builder().name(n).build()).toList()
             );
         } catch (DataIntegrityViolationException e) {
-            var nowExisting = permissionRepository.findByNameInIgnoreCase(names).stream()
-                    .map(Permission::getName)
-                    .collect(java.util.stream.Collectors.toSet());
-            throw new com.example.accesscontrol.exception.DuplicateResourceException(
-                    "Permissions already exist: " + nowExisting);
+            var nowExisting = permissionRepository
+                    .findByNameInIgnoreCase(names.stream().map(s -> s.toLowerCase(Locale.ROOT)).toList())
+                    .stream().map(Permission::getName).collect(java.util.stream.Collectors.toSet());
+            throw new DuplicateResourceException("Permissions already exist: " + nowExisting);
         }
 
-        var items = saved.stream()
+        List<PermissionResponse> items = saved.stream()
                 .sorted(java.util.Comparator.comparing(Permission::getName, java.text.Collator.getInstance())
                         .thenComparing(Permission::getId))
                 .map(p -> PermissionResponse.builder().id(p.getId()).name(p.getName()).build())
@@ -137,9 +134,9 @@ public class PermissionService {
                     .build();
         }
 
-        var dup = permissionRepository.findByNameInIgnoreCase(java.util.List.of(newName)).stream()
-                .filter(existing -> !existing.getId().equals(permissionId))
-                .findFirst();
+        var dup = permissionRepository
+                .findByNameInIgnoreCase(List.of(newName.toLowerCase(Locale.ROOT)))
+                .stream().filter(existing -> !existing.getId().equals(permissionId)).findFirst();
         if (dup.isPresent()) {
             throw new DuplicateResourceException("Permission name already exists");
         }
@@ -170,9 +167,7 @@ public class PermissionService {
             throw new IllegalArgumentException("No permission IDs provided");
         }
 
-        var ids = permissionIds.stream()
-                .filter(Objects::nonNull).filter(id -> id > 0)
-                .distinct().toList();
+        var ids = permissionIds.stream().filter(Objects::nonNull).filter(id -> id > 0).distinct().toList();
         if (ids.isEmpty()) {
             throw new IllegalArgumentException("No valid permission IDs provided");
         }
@@ -181,14 +176,16 @@ public class PermissionService {
         if (existing.size() != ids.size()) {
             var found = existing.stream().map(Permission::getId).collect(java.util.stream.Collectors.toSet());
             var missing = ids.stream().filter(id -> !found.contains(id)).toList();
-            throw new com.example.accesscontrol.exception.ResourceNotFoundException(
-                    "Some permissions not found: " + missing);
+            throw new ResourceNotFoundException("Some permissions not found: " + missing);
         }
 
         try {
-            rolePermissionService.deleteByPermissionIds(ids);
-
-            permissionRepository.deleteAllByIdInBatch(ids);
+            for (Permission perm : existing) {
+                for (Role r : new ArrayList<>(perm.getRoles())) {
+                    r.getPermissions().remove(perm);
+                }
+            }
+            permissionRepository.deleteAllInBatch(existing);
         } catch (DataIntegrityViolationException ex) {
             throw new IllegalArgumentException("Cannot delete permissions due to existing references: " +
                     (ex.getMostSpecificCause() == null ? ex.getMessage() : ex.getMostSpecificCause().getMessage()));
@@ -198,9 +195,7 @@ public class PermissionService {
         String actor = (auth == null) ? "unknown" : auth.getName();
         log.info("permissions.delete success actor={} deleted={}", mask(actor), ids.size());
 
-        return MessageResponse.builder()
-                .message("Permissions deleted successfully")
-                .build();
+        return MessageResponse.builder().message("Permissions deleted successfully").build();
     }
 
     @Transactional(readOnly = true)

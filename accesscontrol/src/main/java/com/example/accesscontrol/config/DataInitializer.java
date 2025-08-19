@@ -1,190 +1,175 @@
 package com.example.accesscontrol.config;
 
-import com.example.accesscontrol.entity.*;
-import com.example.accesscontrol.enums.RoleType;
-import com.example.accesscontrol.repository.*;
+import com.example.accesscontrol.entity.Group;
+import com.example.accesscontrol.entity.Permission;
+import com.example.accesscontrol.entity.Role;
+import com.example.accesscontrol.entity.User;
+import com.example.accesscontrol.repository.GroupRepository;
+import com.example.accesscontrol.repository.PermissionRepository;
+import com.example.accesscontrol.repository.RoleRepository;
+import com.example.accesscontrol.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @Configuration
 @RequiredArgsConstructor
+@Slf4j
 public class DataInitializer implements CommandLineRunner {
-
-    private static final int MIN_COUNT = 10;
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PermissionRepository permissionRepository;
     private final GroupRepository groupRepository;
-
-    private final UserRoleRepository userRoleRepository;
-    private final UserGroupRepository userGroupRepository;
-    private final GroupRoleRepository groupRoleRepository;
-    private final RolePermissionRepository rolePermissionRepository;
-
     private final PasswordEncoder passwordEncoder;
+
+    private static final List<String> ROLE_NAMES = List.of("ADMIN", "MEMBER");
+
+    private static final List<String> PERMISSION_NAMES = List.of(
+            "USER_CREATE", "USER_UPDATE", "USER_DELETE", "USER_VIEW",
+            "ROLE_CREATE", "ROLE_UPDATE", "ROLE_DELETE", "ROLE_VIEW",
+            "GROUP_CREATE", "GROUP_UPDATE", "GROUP_DELETE", "GROUP_VIEW",
+            "PERMISSION_VIEW"
+    );
+
+    private static final List<String> GROUP_NAMES = List.of("Engineering", "Marketing", "HR", "Students", "Staff");
 
     @Override
     @Transactional
     public void run(String... args) {
-        List<Role> roles = ensureFixedRoles();
+        final String sentinelEmail = "user1@local";
+        if (userRepository.findByEmail(sentinelEmail).isPresent()) {
+            log.info("DataInitializer: seed data already present. Skipping.");
+            return;
+        }
 
-        List<Permission> permissions = ensureMinPermissions(MIN_COUNT);
-        List<Group> groups = ensureMinGroups(MIN_COUNT);
-        List<User> users = ensureMinUsers(MIN_COUNT);
+        log.info("DataInitializer: seeding default data…");
 
-        ensureMinUserRoles(users, roles, MIN_COUNT);
-        ensureMinUserGroups(users, groups, MIN_COUNT);
-        ensureMinGroupRoles(groups, roles, MIN_COUNT);
-        ensureMinRolePermissions(roles, permissions, MIN_COUNT);
+        Map<String, Role> roles = ensureRoles(ROLE_NAMES);
+        Map<String, Permission> perms = ensurePermissions(PERMISSION_NAMES);
+        Map<String, Group> groups = ensureGroups(GROUP_NAMES);
 
-        System.out.println("DataInitializer completed.");
+        wireRolePermissions(roles, perms);
+
+        List<User> users = IntStream.rangeClosed(1, 10)
+                .mapToObj(i -> {
+                    String email = "user" + i + "@example.com";
+                    String pwd = "password" + i;
+                    boolean enabled = (i % 2 == 0);
+                    if (i == 1) enabled = true;
+                    return ensureUser(email, pwd, enabled);
+                })
+                .collect(Collectors.toList());
+
+        User admin = users.get(0);
+        addUserRole(admin, roles.get("ADMIN"));
+        users.forEach(u -> addUserRole(u, roles.get("MEMBER")));
+        userRepository.saveAll(users);
+
+        List<Group> groupList = new ArrayList<>(groups.values());
+        for (int i = 0; i < users.size(); i++) {
+            addUserGroup(users.get(i), groupList.get(i % groupList.size()));
+        }
+        userRepository.saveAll(users);
+
+        for (Group g : groupList) {
+            addGroupRole(g, roles.get("MEMBER"));
+        }
+        roleRepository.saveAll(List.of(roles.get("ADMIN"), roles.get("MEMBER")));
+
+        log.info("DataInitializer: seeding complete.");
     }
 
-    private List<Role> ensureFixedRoles() {
-        List<Role> out = new ArrayList<>();
-        for (RoleType type : RoleType.values()) {
-            Role role = roleRepository.findByName(type.name()).orElse(null);
-            if (role == null) {
-                role = roleRepository.save(Role.builder().name(type.name()).build());
-            }
-            out.add(role);
+
+    private Map<String, Role> ensureRoles(Collection<String> names) {
+        Map<String, Role> out = new LinkedHashMap<>();
+        for (String n : names) {
+            Role r = roleRepository.findByName(n)
+                    .orElseGet(() -> roleRepository.save(Role.builder().name(n).build()));
+            out.put(n, r);
         }
         return out;
     }
 
-    private List<Permission> ensureMinPermissions(int min) {
-        List<Permission> existing = permissionRepository.findAll();
-        Set<String> namesUpper = new HashSet<>();
-        existing.forEach(p -> namesUpper.add(p.getName().toUpperCase(Locale.ROOT)));
+    private Map<String, Permission> ensurePermissions(Collection<String> names) {
+        Set<String> lower = names.stream().map(s -> s.toLowerCase(Locale.ROOT)).collect(Collectors.toSet());
+        List<Permission> existing = permissionRepository.findByNameInIgnoreCase(lower);
 
-        List<Permission> toInsert = new ArrayList<>();
-        for (int i = 1; i <= min; i++) {
-            String name = "PERM_" + String.format("%03d", i);
-            if (!namesUpper.contains(name.toUpperCase(Locale.ROOT))) {
-                toInsert.add(Permission.builder().name(name).build());
+        Map<String, Permission> byName = existing.stream()
+                .collect(Collectors.toMap(Permission::getName, p -> p, (a, b) -> a, LinkedHashMap::new));
+
+        for (String n : names) {
+            boolean exists = byName.keySet().stream().anyMatch(x -> x.equalsIgnoreCase(n));
+            if (!exists) {
+                Permission saved = permissionRepository.save(Permission.builder().name(n).build());
+                byName.put(saved.getName(), saved);
             }
         }
-        if (!toInsert.isEmpty()) {
-            existing.addAll(permissionRepository.saveAll(toInsert));
-        }
-        return existing;
+
+        Map<String, Permission> out = new LinkedHashMap<>();
+        byName.values().forEach(p -> out.put(p.getName(), p));
+        return out;
     }
 
-    private List<Group> ensureMinGroups(int min) {
-        List<Group> existing = groupRepository.findAll();
-        Set<String> namesUpper = new HashSet<>();
-        existing.forEach(g -> namesUpper.add(g.getName().toUpperCase(Locale.ROOT)));
+    private Map<String, Group> ensureGroups(Collection<String> names) {
+        Set<String> lower = names.stream().map(s -> s.toLowerCase(Locale.ROOT)).collect(Collectors.toSet());
+        List<Group> existing = groupRepository.findByNameInIgnoreCase(lower);
 
-        List<Group> toInsert = new ArrayList<>();
-        for (int i = 1; i <= min; i++) {
-            String name = "Group " + String.format("%02d", i);
-            if (!namesUpper.contains(name.toUpperCase(Locale.ROOT))) {
-                toInsert.add(Group.builder().name(name).build());
+        Map<String, Group> byName = existing.stream()
+                .collect(Collectors.toMap(Group::getName, g -> g, (a, b) -> a, LinkedHashMap::new));
+
+        for (String n : names) {
+            boolean exists = byName.keySet().stream().anyMatch(x -> x.equalsIgnoreCase(n));
+            if (!exists) {
+                Group saved = groupRepository.save(Group.builder().name(n).build());
+                byName.put(saved.getName(), saved);
             }
         }
-        if (!toInsert.isEmpty()) {
-            existing.addAll(groupRepository.saveAll(toInsert));
-        }
-        return existing;
+
+        Map<String, Group> out = new LinkedHashMap<>();
+        byName.values().forEach(g -> out.put(g.getName(), g));
+        return out;
     }
 
-    private List<User> ensureMinUsers(int min) {
-        List<User> existing = userRepository.findAll();
-        Set<String> emailsLower = new HashSet<>();
-        existing.forEach(u -> emailsLower.add(u.getEmail().toLowerCase(Locale.ROOT)));
-
-        List<User> toInsert = new ArrayList<>();
-        for (int i = 1; i <= min; i++) {
-            String email = "user" + i + "@example.com";
-            if (!emailsLower.contains(email.toLowerCase(Locale.ROOT))) {
-                toInsert.add(User.builder().email(email).password(passwordEncoder.encode("123456")).enabled(true).build());
-            }
-        }
-        if (!toInsert.isEmpty()) {
-            existing.addAll(userRepository.saveAll(toInsert));
-        }
-        return existing;
+    private User ensureUser(String email, String rawPassword, boolean enabled) {
+        return userRepository.findByEmail(email).orElseGet(() ->
+                userRepository.save(User.builder()
+                        .email(email)
+                        .password(passwordEncoder.encode(rawPassword))
+                        .enabled(enabled)
+                        .build()));
     }
 
-    void ensureMinUserRoles(List<User> users, List<Role> roles, int min) {
-        long current = userRoleRepository.count();
-        if (current >= min || users.isEmpty() || roles.isEmpty()) return;
+    private void wireRolePermissions(Map<String, Role> roles, Map<String, Permission> perms) {
+        Role admin = roles.get("ADMIN");
+        Role member = roles.get("MEMBER");
 
-        int needed = (int) (min - current);
-        List<UserRole> toInsert = new ArrayList<>(needed);
+        admin.getPermissions().addAll(perms.values());
+        roleRepository.save(admin);
 
-        for (int i = 0; i < needed; i++) {
-            User u = users.get(i % users.size());
-            Role r = roles.get(i % roles.size());
-
-            if (!userRoleRepository.existsByUser_IdAndRole_Id(u.getId(), r.getId())) {
-                toInsert.add(UserRole.builder().user(u).role(r).build());
-            }
-        }
-
-        if (!toInsert.isEmpty()) userRoleRepository.saveAll(toInsert);
+        List<Permission> memberView = perms.values().stream()
+                .filter(p -> p.getName().endsWith("_VIEW") || p.getName().equals("PERMISSION_VIEW"))
+                .toList();
+        member.getPermissions().addAll(memberView);
+        roleRepository.save(member);
     }
 
-    void ensureMinUserGroups(List<User> users, List<Group> groups, int min) {
-        long current = userGroupRepository.count();
-        if (current >= min || users.isEmpty() || groups.isEmpty()) return;
-
-        int needed = (int) (min - current);
-        List<UserGroup> toInsert = new ArrayList<>(needed);
-
-        for (int i = 0; i < needed; i++) {
-            User u = users.get(i % users.size());
-            Group g = groups.get(i % groups.size());
-
-            if (!userGroupRepository.existsByUser_IdAndGroup_Id(u.getId(), g.getId())) {
-                toInsert.add(UserGroup.builder().user(u).group(g).build());
-            }
-        }
-
-        if (!toInsert.isEmpty()) userGroupRepository.saveAll(toInsert);
+    private void addUserRole(User user, Role role) {
+        user.getRoles().add(role);
     }
 
-    void ensureMinGroupRoles(List<Group> groups, List<Role> roles, int min) {
-        long current = groupRoleRepository.count();
-        if (current >= min || groups.isEmpty() || roles.isEmpty()) return;
-
-        int needed = (int) (min - current);
-        List<GroupRole> toInsert = new ArrayList<>(needed);
-
-        for (int i = 0; i < needed; i++) {
-            Group g = groups.get(i % groups.size());
-            Role r = roles.get(i % roles.size());
-
-            if (!groupRoleRepository.existsByGroup_IdAndRole_Id(g.getId(), r.getId())) {
-                toInsert.add(GroupRole.builder().group(g).role(r).build());
-            }
-        }
-
-        if (!toInsert.isEmpty()) groupRoleRepository.saveAll(toInsert);
+    private void addUserGroup(User user, Group group) {
+        user.getGroups().add(group);
     }
 
-    private void ensureMinRolePermissions(List<Role> roles, List<Permission> perms, int min) {
-        long current = rolePermissionRepository.count();
-        if (current >= min || roles.isEmpty() || perms.isEmpty()) return;
-
-        int needed = (int) (min - current);
-        List<RolePermission> toInsert = new ArrayList<>(needed);
-
-        for (int i = 0; i < needed; i++) {
-            Role r = roles.get(i % roles.size());
-            Permission p = perms.get(i % perms.size());
-
-            if (!rolePermissionRepository.existsByRole_IdAndPermission_Id(r.getId(), p.getId())) {
-                toInsert.add(RolePermission.builder().role(r).permission(p).build());
-            }
-        }
-
-        if (!toInsert.isEmpty()) rolePermissionRepository.saveAll(toInsert);
+    private void addGroupRole(Group group, Role role) {
+        role.getGroups().add(group);
     }
 }

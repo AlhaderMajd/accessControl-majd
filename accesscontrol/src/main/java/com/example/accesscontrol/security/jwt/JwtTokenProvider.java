@@ -14,40 +14,39 @@ import java.util.Date;
 
 @Component
 public class JwtTokenProvider {
-
     @Value("${jwt.secret}")
     private String secret;
 
-    private SecretKey key;
+    private SecretKey secretKey;
 
     @PostConstruct
     protected void init() {
-        this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+        this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
     public String generateToken(String email) {
         Date now = new Date();
-        Date expiry = new Date(now.getTime() + 1000L * 60 * 60); // 1 hour
+        Date expiryDate = new Date(now.getTime() + 1000L * 60L * 60L);
         Claims claims = Jwts.claims().setSubject(email);
         return Jwts.builder()
                 .setClaims(claims)
                 .setIssuedAt(now)
-                .setExpiration(expiry)
-                .signWith(key, SignatureAlgorithm.HS256)
+                .setExpiration(expiryDate)
+                .signWith(secretKey, SignatureAlgorithm.HS256)
                 .compact();
     }
 
     public boolean validateToken(String token) {
-        try {
-            Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token);
+        try{
+            Jwts.parserBuilder().setSigningKey(secretKey).build().parseClaimsJws(token);
             return true;
-        } catch (Exception e) {
+        }catch (Exception e){
             return false;
         }
     }
 
     public String getEmailFromToken(String token) {
-        return Jwts.parserBuilder().setSigningKey(key).build()
+        return Jwts.parserBuilder().setSigningKey(secretKey).build()
                 .parseClaimsJws(token)
                 .getBody()
                 .getSubject();

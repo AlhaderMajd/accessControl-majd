@@ -13,25 +13,24 @@ import java.util.Set;
         uniqueConstraints = @UniqueConstraint(name = "uk_permissions_name", columnNames = "name"),
         indexes = @Index(name = "idx_permissions_name", columnList = "name")
 )
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString(exclude = "rolePermissions")
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Permission {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @EqualsAndHashCode.Include
     private Long id;
 
-    @Column(nullable = false, length = 100)
+    @Column(nullable = false, length = 100, unique = true)
     private String name;
 
     @Version
-    private long version;
+    private Long version;
 
-    @OneToMany(mappedBy = "permission", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @Builder.Default
+    @ManyToMany(mappedBy = "permissions")
     @BatchSize(size = 50)
-    private Set<RolePermission> rolePermissions = new LinkedHashSet<>();
+    private Set<Role> roles = new LinkedHashSet<>();
 }

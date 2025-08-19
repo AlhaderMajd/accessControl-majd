@@ -6,6 +6,8 @@ import com.example.accesscontrol.dto.group.*;
 import com.example.accesscontrol.dto.role.RoleResponse;
 import com.example.accesscontrol.dto.user.getUsers.UserSummaryResponse;
 import com.example.accesscontrol.entity.Group;
+import com.example.accesscontrol.entity.Role;
+import com.example.accesscontrol.entity.User;
 import com.example.accesscontrol.exception.ResourceNotFoundException;
 import com.example.accesscontrol.repository.GroupRepository;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +17,7 @@ import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.text.Collator;
 import java.util.*;
 
 @Slf4j
@@ -23,10 +26,6 @@ import java.util.*;
 public class GroupService {
 
     private final GroupRepository groupRepository;
-    private final UserGroupService userGroupService;
-    private final GroupRoleService groupRoleService;
-    private final UserService userService;
-    private final RoleService roleService;
 
     @Transactional
     public CreateGroupsResponse createGroups(List<CreateGroupRequest> items) {
@@ -53,9 +52,9 @@ public class GroupService {
                     "Duplicate group names in request: " + dupNames);
         }
 
-        var existing = groupRepository.findByNameInIgnoreCase(names).stream()
-                .map(Group::getName)
-                .collect(java.util.stream.Collectors.toSet());
+        var existing = groupRepository.findByNameInIgnoreCase(
+                names.stream().map(s -> s.toLowerCase(Locale.ROOT)).toList()
+        ).stream().map(Group::getName).collect(java.util.stream.Collectors.toSet());
         if (!existing.isEmpty()) {
             throw new com.example.accesscontrol.exception.DuplicateResourceException(
                     "Some group names already exist: " + existing);
@@ -67,9 +66,9 @@ public class GroupService {
                     names.stream().map(n -> Group.builder().name(n).build()).toList()
             );
         } catch (DataIntegrityViolationException e) {
-            var nowExisting = groupRepository.findByNameInIgnoreCase(names).stream()
-                    .map(Group::getName)
-                    .collect(java.util.stream.Collectors.toSet());
+            var nowExisting = groupRepository.findByNameInIgnoreCase(
+                    names.stream().map(s -> s.toLowerCase(Locale.ROOT)).toList()
+            ).stream().map(Group::getName).collect(java.util.stream.Collectors.toSet());
             throw new com.example.accesscontrol.exception.DuplicateResourceException(
                     "Some group names already exist: " + nowExisting);
         }
@@ -79,7 +78,7 @@ public class GroupService {
                 .toList();
 
         var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        String actor = (auth == null) ? "unknown" : auth.getName();
+        String actor = auth == null ? "unknown" : auth.getName();
         log.info("groups.create success actor={} created={}", mask(actor), saved.size());
 
         return CreateGroupsResponse.builder()
@@ -112,23 +111,24 @@ public class GroupService {
 
     @Transactional(readOnly = true)
     public GroupDetailsResponse getGroupDetails(Long groupId) {
-        Group group = getByIdOrThrow(groupId);
+        Group group = groupRepository.findWithUsersAndRolesById(groupId)
+                .orElseThrow(() -> new ResourceNotFoundException("Group not found"));
 
-        var userIds = userGroupService.getUserIdsByGroupId(groupId);
-        var roleIds = groupRoleService.getRoleIdsByGroupId(groupId);
-
-        List<UserSummaryResponse> users = userService.getUserSummariesByIds(userIds);
-        List<RoleResponse> roles = roleService.getRoleSummariesByIds(roleIds);
-
-        users = users.stream()
-                .sorted(java.util.Comparator
-                        .comparing(UserSummaryResponse::getEmail, java.text.Collator.getInstance())
+        List<UserSummaryResponse> users = group.getUsers().stream()
+                .map(u -> UserSummaryResponse.builder()
+                        .id(u.getId())
+                        .email(u.getEmail())
+                        .enabled(u.isEnabled())
+                        .build())
+                .sorted(Comparator
+                        .comparing(UserSummaryResponse::getEmail, Collator.getInstance())
                         .thenComparing(UserSummaryResponse::getId))
                 .toList();
 
-        roles = roles.stream()
-                .sorted(java.util.Comparator
-                        .comparing(RoleResponse::getName, java.text.Collator.getInstance())
+        List<RoleResponse> roles = group.getRoles().stream()
+                .map(r -> RoleResponse.builder().id(r.getId()).name(r.getName()).build())
+                .sorted(Comparator
+                        .comparing(RoleResponse::getName, Collator.getInstance())
                         .thenComparing(RoleResponse::getId))
                 .toList();
 
@@ -150,9 +150,10 @@ public class GroupService {
             throw new IllegalArgumentException("Invalid or missing group name");
         }
 
-        Group group = getByIdOrThrow(groupId);
-        String old = group.getName();
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new ResourceNotFoundException("Group not found"));
 
+        String old = group.getName();
         if (old != null && old.equalsIgnoreCase(newName)) {
             log.info("groups.update_name no_change groupId={} name='{}'", groupId, old);
             return UpdateGroupNameResponse.builder()
@@ -163,9 +164,8 @@ public class GroupService {
                     .build();
         }
 
-        var dup = groupRepository.findByNameInIgnoreCase(java.util.List.of(newName)).stream()
-                .filter(g -> !g.getId().equals(groupId))
-                .findFirst();
+        var dup = groupRepository.findByNameInIgnoreCase(List.of(newName.toLowerCase(Locale.ROOT)))
+                .stream().filter(g -> !g.getId().equals(groupId)).findFirst();
         if (dup.isPresent()) {
             throw new com.example.accesscontrol.exception.DuplicateResourceException("Group name already exists");
         }
@@ -178,7 +178,7 @@ public class GroupService {
         }
 
         var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        String actor = (auth == null) ? "unknown" : auth.getName();
+        String actor = auth == null ? "unknown" : auth.getName();
         log.info("groups.update_name success actor={} groupId={} old='{}' new='{}'",
                 mask(actor), groupId, old, newName);
 
@@ -195,9 +195,7 @@ public class GroupService {
         if (groupIds == null || groupIds.isEmpty())
             throw new IllegalArgumentException("Invalid or empty group IDs list");
 
-        var ids = groupIds.stream()
-                .filter(Objects::nonNull).filter(id -> id > 0)
-                .distinct().toList();
+        var ids = groupIds.stream().filter(Objects::nonNull).filter(id -> id > 0).distinct().toList();
         if (ids.isEmpty())
             throw new IllegalArgumentException("Invalid or empty group IDs list");
 
@@ -209,27 +207,25 @@ public class GroupService {
         }
 
         try {
-            userGroupService.deleteByGroupIds(ids);
-            groupRoleService.deleteByGroupIds(ids);
-
-            groupRepository.deleteAllByIdInBatch(ids);
+            for (Group g : existing) {
+                for (User u : new ArrayList<>(g.getUsers())) {
+                    u.getGroups().remove(g);
+                }
+                for (Role r : new ArrayList<>(g.getRoles())) {
+                    r.getGroups().remove(g);
+                }
+            }
+            groupRepository.deleteAllInBatch(existing);
         } catch (DataIntegrityViolationException ex) {
             throw new IllegalArgumentException("Cannot delete groups due to existing references: " +
                     (ex.getMostSpecificCause() == null ? ex.getMessage() : ex.getMostSpecificCause().getMessage()));
         }
 
         var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        String actor = (auth == null) ? "unknown" : auth.getName();
+        String actor = auth == null ? "unknown" : auth.getName();
         log.info("groups.delete success actor={} deleted={}", mask(actor), ids.size());
 
-        return MessageResponse.builder()
-                .message("Group(s) deleted successfully")
-                .build();
-    }
-
-    @Transactional(readOnly = true)
-    public Group getByIdOrThrow(Long id) {
-        return groupRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Group not found"));
+        return MessageResponse.builder().message("Group(s) deleted successfully").build();
     }
 
     private String mask(String email) {

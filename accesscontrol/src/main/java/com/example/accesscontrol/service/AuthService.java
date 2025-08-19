@@ -18,6 +18,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -35,11 +36,9 @@ public class AuthService {
     );
 
     private final UserService userService;
-    private final UserRoleService userRoleService;
     private final RoleService roleService;
     private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
-
     private final logs logs;
 
     @Transactional(readOnly = true)
@@ -48,7 +47,7 @@ public class AuthService {
         final String password = request.getPassword();
 
         if (isInvalidPassword(password) || isInvalidEmail(email)) {
-            throw deny(email, "invalid_format"); //401
+            throw deny(email, "invalid_format");
         }
 
         final User user;
@@ -56,21 +55,21 @@ public class AuthService {
             user = userService.getByEmailOrThrow(email);
         } catch (UserNotFoundException ex) {
             passwordEncoder.matches("dummy-password", DUMMY_BCRYPT);
-            throw deny(email, "not_found"); //401
+            throw deny(email, "not_found");
         }
 
         if (!passwordEncoder.matches(password, user.getPassword())) {
-            throw deny(email, "bad_password"); //401
+            throw deny(email, "bad_password");
         }
 
         if (!user.isEnabled()) {
             auditLoginFailure(email, "disabled");
-            throw new UserDisabledException(); //403
+            throw new UserDisabledException();
         }
 
-        final List<String> roles = userRoleService.getRoleNamesByUserId(user.getId());
-        if (roles == null || roles.isEmpty()) {
-            throw deny(email, "no_roles"); //401
+        final List<String> roles = user.getRoles().stream().map(Role::getName).toList();
+        if (roles.isEmpty()) {
+            throw deny(email, "no_roles");
         }
 
         final String token = jwtTokenProvider.generateToken(user.getEmail());
@@ -80,7 +79,7 @@ public class AuthService {
                 .token(token)
                 .userId(user.getId())
                 .roles(roles)
-                .build(); //200
+                .build();
     }
 
     @Transactional
@@ -89,12 +88,12 @@ public class AuthService {
         final String rawPassword = request.getPassword();
 
         if (isInvalidEmail(email) || isInvalidPassword(rawPassword)) {
-            throw deny(email, "invalid_format"); //401
+            throw deny(email, "invalid_format");
         }
 
         if (userService.emailExists(email)) {
             auditRegisterFailure(email, "email_in_use_precheck");
-            throw new EmailAlreadyUsedException("Email already in use"); //409
+            throw new EmailAlreadyUsedException("Email already in use");
         }
 
         try {
@@ -107,18 +106,24 @@ public class AuthService {
             User saved = userService.save(newUser);
 
             Role member = roleService.getOrCreateRole("MEMBER");
-            userRoleService.assignRolesToUsers(List.of(saved.getId()), List.of(member.getId()));
+
+            if (saved.getRoles() == null) {
+                saved.setRoles(new LinkedHashSet<>());
+            }
+            saved.getRoles().add(member);
+
+            userService.save(saved);
 
             auditRegisterSuccess(saved.getId(), email);
 
             return RegisterAuthResponse.builder()
                     .userId(saved.getId())
                     .roles(List.of(member.getName()))
-                    .build(); //201
+                    .build();
 
         } catch (DataIntegrityViolationException ex) {
             auditRegisterFailure(email, "email_in_use_violation");
-            throw new EmailAlreadyUsedException("Email already in use"); //409
+            throw new EmailAlreadyUsedException("Email already in use");
         }
     }
 

@@ -1,7 +1,8 @@
 package com.example.accesscontrol.controller;
 
-import com.example.accesscontrol.dto.common.MessageResponse;
+import com.example.accesscontrol.config.logs;
 import com.example.accesscontrol.dto.common.PageResponse;
+import com.example.accesscontrol.dto.common.MessageResponse;
 import com.example.accesscontrol.dto.group.*;
 import com.example.accesscontrol.service.GroupService;
 import jakarta.validation.Valid;
@@ -25,14 +26,14 @@ import java.util.List;
 public class GroupController {
 
     private final GroupService groupService;
+    private final logs logs;
 
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ResponseEntity<CreateGroupsResponse> createGroups(@RequestBody @Valid List<CreateGroupRequest> body) {
         var auth = SecurityContextHolder.getContext().getAuthentication();
-        String actor = (auth == null) ? "unknown" : auth.getName();
-        log.info("groups.create request actor={} count={}", mask(actor), body == null ? 0 : body.size());
-
+        String actor = auth == null ? "unknown" : auth.getName();
+        log.info("groups.create request actor={} count={}", logs.mask(actor), body == null ? 0 : body.size());
         var resp = groupService.createGroups(body);
         return ResponseEntity.status(HttpStatus.CREATED).body(resp);
     }
@@ -45,9 +46,9 @@ public class GroupController {
             @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size) {
 
         var auth = SecurityContextHolder.getContext().getAuthentication();
-        String actor = (auth == null) ? "unknown" : auth.getName();
+        String actor = auth == null ? "unknown" : auth.getName();
         log.info("groups.list request actor={} page={} size={} q_len={}",
-                mask(actor), page, size, q == null ? 0 : q.length());
+                logs.mask(actor), page, size, q == null ? 0 : q.length());
 
         var resp = groupService.getGroups(q, page, size);
         return ResponseEntity.ok(resp);
@@ -57,9 +58,8 @@ public class GroupController {
     @GetMapping("/{groupId}")
     public ResponseEntity<GroupDetailsResponse> getGroupDetails(@PathVariable @Min(1) Long groupId) {
         var auth = SecurityContextHolder.getContext().getAuthentication();
-        String actor = (auth == null) ? "unknown" : auth.getName();
-        log.info("groups.details request actor={} groupId={}", mask(actor), groupId);
-
+        String actor = auth == null ? "unknown" : auth.getName();
+        log.info("groups.details request actor={} groupId={}", logs.mask(actor), groupId);
         var resp = groupService.getGroupDetails(groupId);
         return ResponseEntity.ok(resp);
     }
@@ -68,12 +68,12 @@ public class GroupController {
     @PutMapping("/{groupId}")
     public ResponseEntity<UpdateGroupNameResponse> updateGroupName(
             @PathVariable @Min(1) Long groupId,
-            @RequestBody @jakarta.validation.Valid UpdateGroupNameRequest body) {
+            @RequestBody @Valid UpdateGroupNameRequest body) {
 
         var auth = SecurityContextHolder.getContext().getAuthentication();
-        String actor = (auth == null) ? "unknown" : auth.getName();
+        String actor = auth == null ? "unknown" : auth.getName();
         log.info("groups.update_name request actor={} groupId={} new_len={}",
-                mask(actor), groupId, body.getName() == null ? 0 : body.getName().length());
+                logs.mask(actor), groupId, body.getName() == null ? 0 : body.getName().length());
 
         var resp = groupService.updateGroupName(groupId, body);
         return ResponseEntity.ok(resp);
@@ -83,16 +83,9 @@ public class GroupController {
     @DeleteMapping
     public ResponseEntity<MessageResponse> deleteGroups(@RequestBody List<Long> groupIds) {
         var auth = SecurityContextHolder.getContext().getAuthentication();
-        String actor = (auth == null) ? "unknown" : auth.getName();
-        log.info("groups.delete request actor={} count={}", mask(actor), groupIds == null ? 0 : groupIds.size());
-
+        String actor = auth == null ? "unknown" : auth.getName();
+        log.info("groups.delete request actor={} count={}", logs.mask(actor), groupIds == null ? 0 : groupIds.size());
         var resp = groupService.deleteGroups(groupIds);
         return ResponseEntity.ok(resp);
-    }
-
-    private String mask(String email) {
-        if (email == null || !email.contains("@")) return "unknown";
-        String[] p = email.split("@", 2);
-        return (p[0].isEmpty() ? "*" : p[0].substring(0,1)) + "***@" + p[1];
     }
 }

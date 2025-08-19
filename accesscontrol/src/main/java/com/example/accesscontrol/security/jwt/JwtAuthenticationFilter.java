@@ -5,8 +5,8 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -22,22 +22,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
-                                    FilterChain chain)
-            throws ServletException, IOException {
+                                    FilterChain chain) throws ServletException, IOException {
 
         String token = getJwtFromRequest(request);
 
         try {
-            if (StringUtils.hasText(token) && jwtTokenProvider.validateToken(token)) {
+            if (StringUtils.hasText(token)
+                    && jwtTokenProvider.validateToken(token)
+                    && SecurityContextHolder.getContext().getAuthentication() == null) {
+
                 String email = jwtTokenProvider.getEmailFromToken(token);
-                UserDetails userDetails = userDetailsService.loadUserByUsername(email);
-                var authentication = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
-                        userDetails, null, userDetails.getAuthorities()
-                );
-                SecurityContextHolder.getContext().setAuthentication(authentication);
+                var userDetails = userDetailsService.loadUserByUsername(email);
+                var auth = new UsernamePasswordAuthenticationToken(
+                        userDetails, null, userDetails.getAuthorities());
+                SecurityContextHolder.getContext().setAuthentication(auth);
             }
-        } catch (Exception ex) {
-            logger.warn("JWT processing failed: " + ex.getMessage());
+        } catch (Exception e) {
+            logger.warn("JWT processing failed: " + e.getMessage());
         }
 
         chain.doFilter(request, response);
@@ -45,7 +46,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private String getJwtFromRequest(HttpServletRequest request) {
         String bearer = request.getHeader("Authorization");
-        return (StringUtils.hasText(bearer) && bearer.startsWith("Bearer "))
-                ? bearer.substring(7) : null;
+        return (StringUtils.hasText(bearer) && bearer.startsWith("Bearer ")) ? bearer.substring(7) : null;
     }
 }

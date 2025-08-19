@@ -13,33 +13,42 @@ import java.util.Set;
         uniqueConstraints = @UniqueConstraint(name = "uk_roles_name", columnNames = "name"),
         indexes = @Index(name = "idx_roles_name", columnList = "name")
 )
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString(exclude = {"userRoles", "rolePermissions", "groupRoles"})
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Role {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @EqualsAndHashCode.Include
     private Long id;
 
-    @Column(nullable = false, length = 100)
+    @Column(nullable = false, length = 100, unique = true)
     private String name;
 
     @Version
-    private long version;
+    private Long version;
 
-    @OneToMany(mappedBy = "role", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @Builder.Default
+    @ManyToMany(mappedBy = "roles")
     @BatchSize(size = 50)
-    private Set<UserRole> userRoles = new LinkedHashSet<>();
+    private Set<User> users = new LinkedHashSet<>();
 
-    @OneToMany(mappedBy = "role", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @Builder.Default
+    @ManyToMany
+    @JoinTable(name = "role_permissions",
+            joinColumns = @JoinColumn(name = "role_id", nullable = false),
+            inverseJoinColumns = @JoinColumn(name = "permission_id", nullable = false),
+            uniqueConstraints = @UniqueConstraint(name = "uk_role_permissions_role_permission", columnNames = {"role_id", "permission_id"}))
     @BatchSize(size = 50)
-    private Set<RolePermission> rolePermissions = new LinkedHashSet<>();
+    private Set<Permission> permissions = new LinkedHashSet<>();
 
-    @OneToMany(mappedBy = "role", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @Builder.Default
+    @ManyToMany
+    @JoinTable(name = "group_roles",
+            joinColumns = @JoinColumn(name = "role_id", nullable = false),
+            inverseJoinColumns = @JoinColumn(name = "group_id", nullable = false),
+            uniqueConstraints = @UniqueConstraint(name = "uk_group_roles_group_role", columnNames = {"group_id", "role_id"}))
     @BatchSize(size = 50)
-    private Set<GroupRole> groupRoles = new LinkedHashSet<>();
+    private Set<Group> groups = new LinkedHashSet<>();
 }

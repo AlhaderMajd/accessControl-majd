@@ -6,14 +6,17 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
 
+@Repository
 public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmail(String email);
     List<User> findAllByEmailIn(List<String> emails);
     boolean existsByEmailIgnoreCase(String email);
+
     @Query(
             value = """
             SELECT new com.example.accesscontrol.dto.user.getUsers.UserSummaryResponse(
@@ -29,4 +32,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
             """
     )
     Page<UserSummaryResponse> searchUserSummaries(@Param("q") String q, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"roles"})
+    Optional<User> findWithRolesByEmail(String email);
+
+    @EntityGraph(attributePaths = {"roles", "groups"})
+    Optional<User> findWithRolesAndGroupsById(Long id);
 }

@@ -13,29 +13,29 @@ import java.util.Set;
         uniqueConstraints = @UniqueConstraint(name = "uk_groups_name", columnNames = "name"),
         indexes = @Index(name = "idx_groups_name", columnList = "name")
 )
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString(exclude = {"userGroups", "groupRoles"})
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Group {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @EqualsAndHashCode.Include
     private Long id;
 
-    @Column(nullable = false, length = 100)
+    @Column(nullable = false, length = 100, unique = true)
     private String name;
 
     @Version
-    private long version;
+    private Long version;
 
-    @OneToMany(mappedBy = "group", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @Builder.Default
+    @ManyToMany(mappedBy = "groups")
     @BatchSize(size = 50)
-    private Set<UserGroup> userGroups = new LinkedHashSet<>();
+    private Set<User> users = new LinkedHashSet<>();
 
-    @OneToMany(mappedBy = "group", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @Builder.Default
+    @ManyToMany(mappedBy = "groups")
     @BatchSize(size = 50)
-    private Set<GroupRole> groupRoles = new LinkedHashSet<>();
+    private Set<Role> roles = new LinkedHashSet<>();
 }
