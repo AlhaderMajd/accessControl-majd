@@ -1,5 +1,6 @@
 package com.example.accesscontrol.exception;
 
+import com.example.accesscontrol.dto.exception.ApiError;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;

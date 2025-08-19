@@ -1,4 +1,4 @@
-package com.example.accesscontrol.exception;
+package com.example.accesscontrol.dto.exception;
 
 import lombok.Builder;
 import lombok.Data;

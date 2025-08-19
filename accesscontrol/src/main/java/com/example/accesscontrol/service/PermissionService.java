@@ -1,5 +1,6 @@
 package com.example.accesscontrol.service;
 
+import com.example.accesscontrol.config.logs;
 import com.example.accesscontrol.dto.common.MessageResponse;
 import com.example.accesscontrol.dto.common.PageResponse;
 import com.example.accesscontrol.dto.permission.*;
@@ -23,6 +24,8 @@ import java.util.*;
 public class PermissionService {
 
     private final PermissionRepository permissionRepository;
+    private final logs logs;
+
 
     @Transactional
     public CreatePermissionsResponse createPermissions(CreatePermissionsRequest request) {
@@ -75,7 +78,7 @@ public class PermissionService {
 
         var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         String actor = (auth == null) ? "unknown" : auth.getName();
-        log.info("permissions.create success actor={} created={}", mask(actor), saved.size());
+        log.info("permissions.create success actor={} created={}", logs.mask(actor), saved.size());
 
         return CreatePermissionsResponse.builder()
                 .message("Permissions created successfully")
@@ -151,7 +154,7 @@ public class PermissionService {
         var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         String actor = (auth == null) ? "unknown" : auth.getName();
         log.info("permissions.update_name success actor={} permissionId={} old='{}' new='{}'",
-                mask(actor), permissionId, old, newName);
+                logs.mask(actor), permissionId, old, newName);
 
         return UpdatePermissionNameResponse.builder()
                 .message("Permission updated successfully")
@@ -193,7 +196,7 @@ public class PermissionService {
 
         var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         String actor = (auth == null) ? "unknown" : auth.getName();
-        log.info("permissions.delete success actor={} deleted={}", mask(actor), ids.size());
+        log.info("permissions.delete success actor={} deleted={}", logs.mask(actor), ids.size());
 
         return MessageResponse.builder().message("Permissions deleted successfully").build();
     }
@@ -206,11 +209,5 @@ public class PermissionService {
     @Transactional(readOnly = true)
     public List<Long> getExistingPermissionIds(List<Long> ids) {
         return permissionRepository.findAllById(ids).stream().map(Permission::getId).toList();
-    }
-
-    private String mask(String email) {
-        if (email == null || !email.contains("@")) return "unknown";
-        String[] p = email.split("@", 2);
-        return (p[0].isEmpty() ? "*" : p[0].substring(0,1)) + "***@" + p[1];
     }
 }

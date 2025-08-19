@@ -1,5 +1,6 @@
 package com.example.accesscontrol.service;
 
+import com.example.accesscontrol.config.logs;
 import com.example.accesscontrol.dto.group.AssignRolesToGroupsRequest;
 import com.example.accesscontrol.dto.permission.PermissionResponse;
 import com.example.accesscontrol.dto.role.*;
@@ -30,6 +31,8 @@ public class RoleService {
 
     private final RoleRepository roleRepository;
     private final PermissionService permissionService;
+    private final logs logs;
+
 
     @PersistenceContext
     private EntityManager em;
@@ -58,11 +61,9 @@ public class RoleService {
 
         var names = normalized.stream().map(CreateRoleRequest::getName).toList();
 
-        // existing names in DB
         var existingNames = roleRepository.findExistingNames(names);
         if (!existingNames.isEmpty()) throw new DuplicateResourceException("Some role names already exist: " + existingNames);
 
-        // validate all permission ids exist
         var allPermissionIds = normalized.stream().flatMap(r -> r.getPermissionIds().stream()).distinct().toList();
         if (!allPermissionIds.isEmpty()) {
             var existingPermIds = permissionService.getExistingPermissionIds(allPermissionIds);
@@ -102,7 +103,7 @@ public class RoleService {
         var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         String actor = (auth == null) ? "unknown" : auth.getName();
         log.info("roles.create success actor={} created={} with_permissions={}",
-                mask(actor), savedRoles.size(), normalized.stream().anyMatch(r -> !r.getPermissionIds().isEmpty()));
+                logs.mask(actor), savedRoles.size(), normalized.stream().anyMatch(r -> !r.getPermissionIds().isEmpty()));
 
         return CreateRoleResponse.builder()
                 .message("Roles created successfully")
@@ -181,7 +182,7 @@ public class RoleService {
         var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         String actor = (auth == null) ? "unknown" : auth.getName();
         log.info("roles.update_name success actor={} roleId={} old='{}' new='{}'",
-                mask(actor), roleId, old, newName);
+                logs.mask(actor), roleId, old, newName);
 
         return UpdateRoleResponse.builder().message("Role name updated successfully").build();
     }
@@ -237,7 +238,7 @@ public class RoleService {
         String actor = (auth == null) ? "unknown" : auth.getName();
         int pairCount = wanted.values().stream().mapToInt(Set::size).sum();
         log.info("roles.permissions.assign success actor={} roles={} pairs_requested={} assigned={}",
-                mask(actor), wanted.size(), pairCount, assigned);
+                logs.mask(actor), wanted.size(), pairCount, assigned);
 
         return "Permissions assigned successfully. Total assignments: " + assigned;
     }
@@ -291,7 +292,7 @@ public class RoleService {
         String actor = (auth == null) ? "unknown" : auth.getName();
         int pairCount = wanted.values().stream().mapToInt(Set::size).sum();
         log.info("roles.permissions.deassign success actor={} roles={} pairs_requested={} removed={}",
-                mask(actor), wanted.size(), pairCount, removed);
+                logs.mask(actor), wanted.size(), pairCount, removed);
 
         return removed > 0 ? "Permissions removed successfully" : "No permissions were removed";
     }
@@ -334,7 +335,7 @@ public class RoleService {
         String actor = (auth == null) ? "unknown" : auth.getName();
         int pairCount = wanted.values().stream().mapToInt(Set::size).sum();
         log.info("roles.groups.assign success actor={} groups={} pairs_requested={} inserted={}",
-                mask(actor), wanted.size(), pairCount, inserted);
+                logs.mask(actor), wanted.size(), pairCount, inserted);
 
         return "Roles assigned to groups successfully. Inserted: " + inserted;
     }
@@ -376,7 +377,7 @@ public class RoleService {
         String actor = (auth == null) ? "unknown" : auth.getName();
         int pairCount = wanted.values().stream().mapToInt(Set::size).sum();
         log.info("roles.groups.deassign success actor={} groups={} pairs_requested={} removed={}",
-                mask(actor), wanted.size(), pairCount, removed);
+                logs.mask(actor), wanted.size(), pairCount, removed);
 
         return (removed > 0) ? "Roles deassigned from groups successfully" : "No roles were deassigned from groups";
     }
@@ -410,16 +411,9 @@ public class RoleService {
 
         var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         String actor = (auth == null) ? "unknown" : auth.getName();
-        log.info("roles.delete success actor={} deleted={}", mask(actor), ids.size());
+        log.info("roles.delete success actor={} deleted={}", logs.mask(actor), ids.size());
 
         return "Roles deleted successfully";
-    }
-
-    @Transactional(readOnly = true)
-    public List<RoleResponse> getRoleSummariesByIds(List<Long> roleIds) {
-        return roleRepository.findAllById(roleIds).stream()
-                .map(r -> RoleResponse.builder().id(r.getId()).name(r.getName()).build())
-                .toList();
     }
 
     @Transactional
@@ -438,16 +432,5 @@ public class RoleService {
         List<Role> roles = roleRepository.findAllById(ids);
         if (roles.size() != ids.size()) throw new ResourceNotFoundException("Some roles not found");
         return roles;
-    }
-
-    @Transactional(readOnly = true)
-    public List<Long> getExistingIds(List<Long> ids) {
-        return roleRepository.findAllById(ids).stream().map(Role::getId).toList();
-    }
-
-    private String mask(String email) {
-        if (email == null || !email.contains("@")) return "unknown";
-        String[] p = email.split("@", 2);
-        return (p[0].isEmpty() ? "*" : p[0].substring(0,1)) + "***@" + p[1];
     }
 }

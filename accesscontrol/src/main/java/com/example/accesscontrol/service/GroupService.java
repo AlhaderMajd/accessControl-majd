@@ -1,5 +1,6 @@
 package com.example.accesscontrol.service;
 
+import com.example.accesscontrol.config.logs;
 import com.example.accesscontrol.dto.common.MessageResponse;
 import com.example.accesscontrol.dto.common.PageResponse;
 import com.example.accesscontrol.dto.group.*;
@@ -26,6 +27,7 @@ import java.util.*;
 public class GroupService {
 
     private final GroupRepository groupRepository;
+    private final logs logs;
 
     @Transactional
     public CreateGroupsResponse createGroups(List<CreateGroupRequest> items) {
@@ -79,7 +81,7 @@ public class GroupService {
 
         var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         String actor = auth == null ? "unknown" : auth.getName();
-        log.info("groups.create success actor={} created={}", mask(actor), saved.size());
+        log.info("groups.create success actor={} created={}", logs.mask(actor), saved.size());
 
         return CreateGroupsResponse.builder()
                 .message("Groups created successfully")
@@ -180,7 +182,7 @@ public class GroupService {
         var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         String actor = auth == null ? "unknown" : auth.getName();
         log.info("groups.update_name success actor={} groupId={} old='{}' new='{}'",
-                mask(actor), groupId, old, newName);
+                logs.mask(actor), groupId, old, newName);
 
         return UpdateGroupNameResponse.builder()
                 .message("Group name updated successfully")
@@ -223,14 +225,8 @@ public class GroupService {
 
         var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         String actor = auth == null ? "unknown" : auth.getName();
-        log.info("groups.delete success actor={} deleted={}", mask(actor), ids.size());
+        log.info("groups.delete success actor={} deleted={}", logs.mask(actor), ids.size());
 
         return MessageResponse.builder().message("Group(s) deleted successfully").build();
-    }
-
-    private String mask(String email) {
-        if (email == null || !email.contains("@")) return "unknown";
-        String[] p = email.split("@", 2);
-        return (p[0].isEmpty() ? "*" : p[0].substring(0,1)) + "***@" + p[1];
     }
 }
