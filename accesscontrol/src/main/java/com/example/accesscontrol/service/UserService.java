@@ -67,6 +67,8 @@ public class UserService {
     @PersistenceContext
     private EntityManager em;
 
+    void setEntityManager(EntityManager em) { this.em = em; }
+
     @Transactional
     public CreateUsersResponse createUsers(CreateUsersRequest request) {
         var users = request == null ? null : request.getUsers();
@@ -111,6 +113,7 @@ public class UserService {
             throw new EmailAlreadyUsedException("Some emails already in use");
         }
 
+        // assign MEMBER role
         Role memberRole = roleService.getOrCreateRole("MEMBER");
         int assigned = 0;
         for (User u : saved) {
@@ -119,7 +122,7 @@ public class UserService {
         userRepository.saveAll(saved);
 
         var principal = SecurityContextHolder.getContext().getAuthentication();
-        String actor = principal == null ? "unknown" : principal.getName();
+        String actor = (principal == null) ? "unknown" : principal.getName();
 
         if (assigned != saved.size()) {
             log.warn("users.create.partial_role_assignment created={} roles_assigned={} actor={}",
@@ -138,11 +141,28 @@ public class UserService {
         if (page < 0 || size < 1 || size > 100) {
             throw new IllegalArgumentException("Invalid pagination params");
         }
-        final String q = search == null ? "" : search.trim().toLowerCase();
-        PageRequest pr = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
-        Page<UserSummaryResponse> p = userRepository.searchUserSummaries(q, pr);
-        return new GetUsersResponse(p.getContent(), page, p.getTotalElements());
+
+        final String q = (search == null ? "" : search.trim().toLowerCase());
+        var pr = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
+
+        // Fetch page of Users with roles batch-loaded (no N+1)
+        Page<User> usersPage = userRepository.searchUsersWithRoles(q, pr);
+
+        var items = usersPage.getContent().stream()
+                .map(u -> UserSummaryResponse.builder()
+                        .id(u.getId())
+                        .email(u.getEmail())
+                        .enabled(u.isEnabled())
+                        .roles(u.getRoles().stream()
+                                .map(Role::getName)
+                                .sorted()
+                                .toList())
+                        .build())
+                .toList();
+
+        return new GetUsersResponse(items, page, usersPage.getTotalElements());
     }
+
 
     @Transactional(readOnly = true)
     public UserResponse getUserDetails(Long id) {
@@ -200,7 +220,7 @@ public class UserService {
         }
 
         var auth = SecurityContextHolder.getContext().getAuthentication();
-        String actor = auth == null ? "unknown" : auth.getName();
+        String actor = (auth == null) ? "unknown" : auth.getName();
         log.info("users.admin.update_credentials success actor={} userId={} emailUpdated={} passwordUpdated={}",
                 logs.mask(actor), user.getId(), emailUpdated, passwordUpdated);
 
@@ -302,7 +322,7 @@ public class UserService {
         var updated = userRepository.saveAll(users);
 
         var auth = SecurityContextHolder.getContext().getAuthentication();
-        String actor = auth == null ? "unknown" : auth.getName();
+        String actor = (auth == null) ? "unknown" : auth.getName();
         log.info("users.status success actor={} updated={} enable={}", logs.mask(actor), updated.size(), enabled);
 
         return UpdateUserStatusResponse.builder()
@@ -333,7 +353,7 @@ public class UserService {
         userRepository.saveAll(users);
 
         var auth = SecurityContextHolder.getContext().getAuthentication();
-        String actor = auth == null ? "unknown" : auth.getName();
+        String actor = (auth == null) ? "unknown" : auth.getName();
         log.info("users.roles.assign success actor={} users={} roles={} assigned={}",
                 logs.mask(actor), users.size(), roles.size(), assigned);
 
@@ -365,7 +385,7 @@ public class UserService {
         userRepository.saveAll(users);
 
         var auth = SecurityContextHolder.getContext().getAuthentication();
-        String actor = auth == null ? "unknown" : auth.getName();
+        String actor = (auth == null) ? "unknown" : auth.getName();
         log.info("users.roles.deassign success actor={} users={} roles={} removed={}",
                 logs.mask(actor), users.size(), roles.size(), removed);
 
@@ -400,7 +420,7 @@ public class UserService {
         userRepository.saveAll(users);
 
         var auth = SecurityContextHolder.getContext().getAuthentication();
-        String actor = auth == null ? "unknown" : auth.getName();
+        String actor = (auth == null) ? "unknown" : auth.getName();
         log.info("users.groups.assign success actor={} users={} groups={} assigned={}",
                 logs.mask(actor), userIds.size(), groupIds.size(), assigned);
 
@@ -433,7 +453,7 @@ public class UserService {
         userRepository.saveAll(users);
 
         var auth = SecurityContextHolder.getContext().getAuthentication();
-        String actor = auth == null ? "unknown" : auth.getName();
+        String actor = (auth == null) ? "unknown" : auth.getName();
         log.info("users.groups.deassign success actor={} users={} groups={} removed={}",
                 logs.mask(actor), userIds.size(), groupIds.size(), removed);
 
@@ -465,7 +485,7 @@ public class UserService {
         }
 
         var auth = SecurityContextHolder.getContext().getAuthentication();
-        String actor = auth == null ? "unknown" : auth.getName();
+        String actor = (auth == null) ? "unknown" : auth.getName();
         log.info("users.delete success actor={} deleted={}", logs.mask(actor), userIds.size());
 
         return DeleteUsersResponse.builder()
@@ -495,11 +515,6 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public User getWithRolesByEmailOrThrow(String email) {
-        return userRepository.findWithRolesByEmail(email).orElseThrow(() -> new UserNotFoundException(email));
-    }
-
-    @Transactional(readOnly = true)
     public boolean emailExists(String email) {
         return userRepository.findByEmail(email).isPresent();
     }
@@ -508,13 +523,9 @@ public class UserService {
     public User save(User user) { return userRepository.save(user); }
 
     @Transactional(readOnly = true)
-    public List<UserSummaryResponse> getUserSummariesByIds(List<Long> userIds) {
-        return userRepository.findAllById(userIds).stream()
-                .map(u -> UserSummaryResponse.builder()
-                        .id(u.getId())
-                        .email(u.getEmail())
-                        .enabled(u.isEnabled())
-                        .build())
-                .toList();
+    public User getWithRolesByEmailOrThrow(String email) {
+        return userRepository.findWithRolesByEmail(email)
+                .orElseThrow(() -> new UserNotFoundException(email));
     }
+
 }

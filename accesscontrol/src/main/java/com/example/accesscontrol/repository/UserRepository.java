@@ -1,6 +1,5 @@
 package com.example.accesscontrol.repository;
 
-import com.example.accesscontrol.dto.user.getUsers.UserSummaryResponse;
 import com.example.accesscontrol.entity.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -17,21 +16,13 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findAllByEmailIn(List<String> emails);
     boolean existsByEmailIgnoreCase(String email);
 
-    @Query(
-            value = """
-            SELECT new com.example.accesscontrol.dto.user.getUsers.UserSummaryResponse(
-                u.id, u.email, u.enabled
-            )
-            FROM User u
-            WHERE (:q = '' OR LOWER(u.email) LIKE LOWER(CONCAT('%', :q, '%')))
-            """,
-            countQuery = """
-            SELECT COUNT(u)
-            FROM User u
-            WHERE (:q = '' OR LOWER(u.email) LIKE LOWER(CONCAT('%', :q, '%')))
-            """
-    )
-    Page<UserSummaryResponse> searchUserSummaries(@Param("q") String q, Pageable pageable);
+    @EntityGraph(attributePaths = {"roles"})
+    @Query("""
+        select u
+        from User u
+        where (:q = '' or lower(u.email) like lower(concat('%', :q, '%')))
+        """)
+    Page<User> searchUsersWithRoles(@Param("q") String q, Pageable pageable);
 
     @EntityGraph(attributePaths = {"roles"})
     Optional<User> findWithRolesByEmail(String email);
